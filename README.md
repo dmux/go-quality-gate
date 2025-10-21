@@ -1,3 +1,6 @@
+[![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
+[![pt-br](https://img.shields.io/badge/lang-pt--br-green.svg)](README.pt-BR.md)
+
 <div align="center">
 
 <img src="doc/gopher.png" alt="Go Quality Gate Logo" width="400">
@@ -12,62 +15,62 @@
 
 </div>
 
-**Ferramenta agnóstica de controle de qualidade com Git hooks**
+**Language-agnostic code quality control tool with Git hooks**
 
-Uma ferramenta de controle de qualidade de código construída em Go, distribuída como um único binário sem dependências externas de runtime. Fornece feedback visual aprimorado com spinners, timing de execução e output JSON estruturado.
+A code quality control tool built in Go, distributed as a single binary with no external runtime dependencies. Provides enhanced visual feedback with spinners, execution timing, and structured JSON output.
 
-## ✨ Características Principais
+## ✨ Key Features
 
-- **🏗️ Binário Único**: Zero dependências de runtime (Python, Node.js)
-- **🔧 Setup Automático**: Instala ferramentas de qualidade automaticamente
-- **🌍 Multi-linguagem**: Suporta múltiplas linguagens em um mesmo repositório
-- **📊 Observabilidade**: Spinners, timing e feedback visual em tempo real
-- **🔒 Segurança Integrada**: Verificação de segredos no fluxo de commit
-- **⚡ Performance Nativa**: Execução instantânea sem interpretadores
-- **🚀 CI/CD Ready**: Output JSON limpo para pipelines de automação
+- **🏗️ Single Binary**: Zero runtime dependencies (Python, Node.js)
+- **🔧 Automatic Setup**: Installs quality tools automatically
+- **🌍 Multi-language**: Supports multiple languages in the same repository
+- **📊 Observability**: Spinners, timing, and real-time visual feedback
+- **🔒 Built-in Security**: Secret scanning in commit workflow
+- **⚡ Native Performance**: Instant execution without interpreters
+- **🚀 CI/CD Ready**: Clean JSON output for automation pipelines
 
 ## 🚀 Quick Start
 
-### 1. Instalação
+### 1. Installation
 
 ```bash
-# Clone e compile
+# Clone and build
 git clone <repo>
 cd go-quality-gate
 go build -o quality-gate ./cmd/quality-gate
 
-# Instale os hooks
+# Install hooks
 ./quality-gate --install
 ```
 
-### 2. Configuração
+### 2. Configuration
 
-Crie um `quality.yml` no seu projeto:
+Create a `quality.yml` in your project:
 
 ```bash
-# Gera configuração inicial baseada no seu projeto
+# Generate initial configuration based on your project
 ./quality-gate --init
 ```
 
-### 3. Uso
+### 3. Usage
 
 ```bash
-# Execução automática via Git hooks
-git commit -m "feat: nova funcionalidade"
+# Automatic execution via Git hooks
+git commit -m "feat: new feature"
 
-# Execução manual
+# Manual execution
 ./quality-gate pre-commit
 
-# Output JSON para CI/CD
+# JSON output for CI/CD
 ./quality-gate --output=json pre-commit
 
-# Correção automática
+# Auto-fix
 ./quality-gate --fix pre-commit
 ```
 
-## ⚙️ Configuração (quality.yml)
+## ⚙️ Configuration (quality.yml)
 
-````yaml
+```yaml
 tools:
   - name: "Gitleaks"
     check_command: "gitleaks version"
@@ -79,84 +82,123 @@ tools:
 hooks:
   security:
     pre-commit:
-      - name: "🔒 Verificação de Segredos"
+      - name: "🔒 Security Check"
         command: "gitleaks detect --no-git --source . --verbose"
         output_rules:
-          on_failure_message: "Vazamento de segredo detectado!"
+          on_failure_message: "Secret leak detected!"
 
   python-backend:
     pre-commit:
-      - name: "🎨 Formatação (Ruff)"
+      - name: "🎨 Format Check (Ruff)"
         command: "ruff format ./backend --check"
         fix_command: "ruff format ./backend"
         output_rules:
           show_on: failure
-          on_failure_message: "Execute './quality-gate --fix' para corrigir."
+          on_failure_message: "Run './quality-gate --fix' to format."
 
   typescript-frontend:
     pre-commit:
-      - name: "🎨 Formatação (Prettier)"
+      - name: "🎨 Format Check (Prettier)"
         command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
         fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
-```Como Usar1. Pré-requisitosGo 1.18+ (apenas para compilar a ferramenta).Gerenciadores de pacotes para as linguagens do seu projeto (ex: pip para Python, npm para Node.js).2. InstalaçãoA instalação é feita em dois passos: compilar o programa e depois usar o próprio programa para instalar os Git hooks.Passo 1: Compilar o executávelgo build -o quality-gate .
+```
 
-Isso criará um executável chamado quality-gate no diretório atual.Passo 2: Instalar os Git Hooks./quality-gate --install
+## 📘 How to Use
 
-O programa irá configurar automaticamente os hooks pre-commit e pre-push.3. Comandos Avançados./quality-gate --init: (Experimental) Tenta analisar a estrutura do seu projeto e gera um arquivo quality.yml inicial com sugestões../quality-gate --fix: Executa os comandos de correção automática (fix_command) definidos no seu quality.yml../quality-gate pre-commit --output=json: Executa o hook especificado e retorna o resultado em formato JSON.4. Configuração (quality.yml)A configuração agora é dividida em duas seções principais: tools (para o gerenciamento de dependências) e hooks (para as verificações).tools: Uma lista de ferramentas necessárias para o projeto.name: Nome legível da ferramenta.check_command: Um comando que retorna sucesso (código de saída 0) se a ferramenta estiver instalada (ex: gitleaks version).install_command: O comando a ser executado para instalar a ferramenta se o check_command falhar.hooks: A configuração das verificações, como antes.Exemplo Abrangente:tools:
+### 1. Build
 
-- name: "Gitleaks"
-  check_command: "gitleaks version"
-  install_command: "go install [github.com/zricethezav/gitleaks/v8@latest](https://github.com/zricethezav/gitleaks/v8@latest)"
-- name: "Ruff (Python Linter/Formatter)"
-  check_command: "ruff --version"
-  install_command: "pip install ruff"
-- name: "Prettier (Code Formatter)"
-  check_command: "npx prettier --version"
-  install_command: "npm install --global prettier"
+```bash
+go build -o quality-gate ./cmd/quality-gate
+```
+
+This will create an executable named `quality-gate` in the current directory.
+
+### 2. Install Git Hooks
+
+```bash
+./quality-gate --install
+```
+
+The program will automatically configure `pre-commit` and `pre-push` hooks.
+
+### 3. Advanced Commands
+
+- **`./quality-gate --init`**: (Experimental) Analyzes your project structure and generates an initial `quality.yml` file with suggestions
+- **`./quality-gate --fix`**: Executes automatic fix commands (`fix_command`) defined in your `quality.yml`
+- **`./quality-gate pre-commit --output=json`**: Executes the specified hook and returns the result in JSON format
+
+### 4. Configuration (quality.yml)
+
+The configuration is divided into two main sections:
+
+- **`tools`**: List of tools required for the project
+
+  - `name`: Human-readable tool name
+  - `check_command`: Command that returns success (exit code 0) if the tool is installed
+  - `install_command`: Command executed to install the tool if `check_command` fails
+
+- **`hooks`**: Quality check configuration
+
+#### Complete Example
+
+```yaml
+tools:
+  - name: "Gitleaks"
+    check_command: "gitleaks version"
+    install_command: "go install github.com/zricethezav/gitleaks/v8@latest"
+  - name: "Ruff (Python Linter/Formatter)"
+    check_command: "ruff --version"
+    install_command: "pip install ruff"
+  - name: "Prettier (Code Formatter)"
+    check_command: "npx prettier --version"
+    install_command: "npm install --global prettier"
 
 hooks:
-security:
-pre-commit: - name: "🔒 Verificação de Segredos (Gitleaks)"
-command: "gitleaks detect --no-git --source . --verbose"
-output_rules:
-on_failure_message: "Vazamento de segredo detectado! Revise o código antes de comitar."
+  security:
+    pre-commit:
+      - name: "🔒 Security Check (Gitleaks)"
+        command: "gitleaks detect --no-git --source . --verbose"
+        output_rules:
+          on_failure_message: "Secret leak detected! Review code before committing."
 
-python-backend:
-pre-commit: - name: "🎨 Verificação de Formato (Ruff)"
-command: "ruff format ./backend --check"
-fix_command: "ruff format ./backend"
-output_rules:
-show_on: failure
-on_failure_message: "Código fora do padrão. Execute './quality-gate --fix' para corrigir."
-
-      - name: "🧪 Testes (Pytest)"
+  python-backend:
+    pre-commit:
+      - name: "🎨 Format Check (Ruff)"
+        command: "ruff format ./backend --check"
+        fix_command: "ruff format ./backend"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Code formatting issue. Run './quality-gate --fix' to fix."
+      - name: "🧪 Tests (Pytest)"
         command: "pytest ./backend"
         output_rules:
           show_on: always
 
-typescript-frontend:
-pre-commit: - name: "🎨 Formatação (Prettier)"
-command: "npx prettier --check 'frontend/**/\*.{ts,tsx}'"
-fix_command: "npx prettier --write 'frontend/**/\*.{ts,tsx}'"
+  typescript-frontend:
+    pre-commit:
+      - name: "🎨 Format Check (Prettier)"
+        command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
+        fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
+```
 
-## 📋 Comandos Disponíveis
+## 📋 Available Commands
 
-| Comando | Descrição | Exemplo |
-|---------|-----------|---------|
-| `--install` | Instala Git hooks no repositório | `./quality-gate --install` |
-| `--init` | Gera quality.yml inicial com análise inteligente | `./quality-gate --init` |
-| `--fix` | Executa correções automáticas | `./quality-gate --fix pre-commit` |
-| `--version, -v` | Mostra informações de versão | `./quality-gate --version` |
-| `--output=json` | Output estruturado para CI/CD | `./quality-gate --output=json pre-commit` |
+| Command         | Description                                             | Example                                   |
+| --------------- | ------------------------------------------------------- | ----------------------------------------- |
+| `--install`     | Installs Git hooks in repository                        | `./quality-gate --install`                |
+| `--init`        | Generates initial quality.yml with intelligent analysis | `./quality-gate --init`                   |
+| `--fix`         | Executes automatic fixes                                | `./quality-gate --fix pre-commit`         |
+| `--version, -v` | Shows version information                               | `./quality-gate --version`                |
+| `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
 
-### 📊 Informações de Versão
+### 📊 Version Information
 
 ```bash
-# Versão simples
+# Simple version
 ./quality-gate --version
 # Output: quality-gate version 1.2.0
 
-# Versão em JSON com detalhes de build
+# JSON version with build details
 ./quality-gate --version --output json
 # Output:
 {
@@ -166,7 +208,7 @@ fix_command: "npx prettier --write 'frontend/**/\*.{ts,tsx}'"
 }
 ```
 
-## 🎯 Output JSON para CI/CD
+## 🎯 JSON Output for CI/CD
 
 ```json
 {
@@ -184,65 +226,65 @@ fix_command: "npx prettier --write 'frontend/**/\*.{ts,tsx}'"
     }
   ]
 }
-````
+```
 
-## 🛠️ Desenvolvimento
+## 🛠️ Development
 
-### Pré-requisitos
+### Prerequisites
 
 - Go 1.18+
 - Git
-- Gerenciadores de pacotes das linguagens do seu projeto (pip, npm, etc.)
+- Package managers for your project languages (pip, npm, etc.)
 
-### Setup Local
+### Local Setup
 
 ```bash
-# Clone o repositório
+# Clone the repository
 git clone <repo>
 cd go-quality-gate
 
-# Instale dependências
+# Install dependencies
 go mod tidy
 
-# Compile
+# Build
 go build -o quality-gate ./cmd/quality-gate
 
-# Execute testes
+# Run tests
 go test ./...
 
-# Teste localmente
+# Test locally
 ./quality-gate --init
 ./quality-gate --install
 ```
 
-### Arquitetura
+### Architecture
 
 ```text
-cmd/quality-gate/     # Aplicação principal
+cmd/quality-gate/     # Main application
 internal/
-  domain/            # Entidades e regras de negócio
-  service/           # Lógica de aplicação
-  infra/             # Infraestrutura (git, shell, logger)
-  repository/        # Interfaces de persistência
-  config/            # Configuração e parsing
+  domain/            # Entities and business rules
+  service/           # Application logic
+  infra/             # Infrastructure (git, shell, logger)
+  repository/        # Persistence interfaces
+  config/            # Configuration and parsing
 ```
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-1. **Fork** o projeto
-2. **Crie** uma branch: `git checkout -b feature/nova-funcionalidade`
-3. **Commit** suas mudanças: `git commit -m 'feat: nova funcionalidade'`
-4. **Push** para a branch: `git push origin feature/nova-funcionalidade`
-5. **Abra** um Pull Request
+1. **Fork** the project
+2. **Create** a branch: `git checkout -b feature/new-feature`
+3. **Commit** your changes: `git commit -m 'feat: new feature'`
+4. **Push** to the branch: `git push origin feature/new-feature`
+5. **Open** a Pull Request
 
-Veja [TODO.md](TODO.md) para roadmap detalhado e tarefas disponíveis.
+See [TODO.md](TODO.md) for detailed roadmap and available tasks.
 
-## 📄 Licença
+## 📄 License
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+This project is under the MIT license. See the [LICENSE](LICENSE) file for more details.
 
 ---
 
-**Versão**: v1.1.x  
-**Status**: Ativo em desenvolvimento  
-**Documentação completa**: [TODO.md](TODO.md)
+**Version**: v1.1.x  
+**Status**: Active development  
+**Complete documentation**: [TODO.md](TODO.md)

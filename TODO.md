@@ -1,156 +1,156 @@
-# Go Quality Gate - Status e TODO
+# Go Quality Gate - Status and TODO
 
-## 📊 Status Atual do Projeto
+## 📊 Current Project Status
 
-**Completude Geral: 95%** (atualizado em outubro de 2025)
+**Overall Completion: 95%** (updated October 2025)
 
-### ✅ Funcionalidades Implementadas
+### ✅ Implemented Features
 
 #### Core Features (100% ✅)
 
-- **Instalação de Git Hooks**: Sistema completo de pre-commit e pre-push
-- **Execução de Verificações**: Engine robusto para executar hooks configurados
-- **Gerenciamento de Ferramentas**: Instalação automática de dependências
-- **Configuração YAML**: Parser completo para quality.yml
-- **Arquitetura Limpa**: Separação em camadas (domain, service, infra, repository)
+- **Git Hooks Installation**: Complete pre-commit and pre-push system
+- **Check Execution**: Robust engine to execute configured hooks
+- **Tool Management**: Automatic dependency installation
+- **YAML Configuration**: Complete parser for quality.yml
+- **Clean Architecture**: Layer separation (domain, service, infra, repository)
 
-#### Comandos Principais (100% ✅)
+#### Main Commands (100% ✅)
 
-- `--install`: Instalação de hooks no repositório Git
-- `--init`: Geração de quality.yml inicial com análise inteligente
-- `--fix`: Execução de comandos de correção automática
-- `--version, -v`: Informações de versão (simples e JSON)
-- `--output=json`: Output estruturado para CI/CD
+- `--install`: Hook installation in Git repository
+- `--init`: Initial quality.yml generation with intelligent analysis
+- `--fix`: Execution of automatic correction commands
+- `--version, -v`: Version information (simple and JSON)
+- `--output=json`: Structured output for CI/CD
 
-#### Melhorias Recentes - Sprint 1 (100% ✅)
+#### Recent Improvements - Sprint 1 (100% ✅)
 
-- ✅ **Bug Fix Crítico**: Output JSON separado (stdout/stderr)
-- ✅ **Spinners Visuais**: Indicadores durante execução com `briandowns/spinner`
-- ✅ **Timing Preciso**: Medição de duração para hooks e ferramentas
-- ✅ **Emojis e Feedback**: Experiência visual aprimorada (✅ ❌ 🔧)
+- ✅ **Critical Bug Fix**: Separated JSON output (stdout/stderr)
+- ✅ **Visual Spinners**: Indicators during execution with `briandowns/spinner`
+- ✅ **Precise Timing**: Duration measurement for hooks and tools
+- ✅ **Emojis and Feedback**: Enhanced visual experience (✅ ❌ 🔧)
 
-#### Infraestrutura (95% ✅)
+#### Infrastructure (95% ✅)
 
-- ✅ **Detecção de Shell**: Suporte automático para zsh/bash
-- ✅ **Logger Flexível**: Sistema de logging com controle de output
-- ✅ **Testes Unitários**: Cobertura com mocks para componentes principais
-- ✅ **Dependency Management**: go.mod limpo e organizado
+- ✅ **Shell Detection**: Automatic support for zsh/bash
+- ✅ **Flexible Logger**: Logging system with output control
+- ✅ **Unit Tests**: Coverage with mocks for main components
+- ✅ **Dependency Management**: Clean and organized go.mod
 
-## 🚧 Em Progresso e TODO
+## 🚧 In Progress and TODO
 
-### ✅ Sprint 2: Análise Inteligente (CONCLUÍDO)
+### ✅ Sprint 2: Intelligent Analysis (COMPLETED)
 
-#### Funcionalidades Implementadas ✅
+#### Implemented Features ✅
 
-- ✅ **Análise Inteligente do `--init`**
+- ✅ **Intelligent `--init` Analysis**
 
-  - ✅ Detectar package.json, requirements.txt, Cargo.toml, composer.json
-  - ✅ Gerar quality.yml customizado baseado na stack do projeto
-  - ✅ Templates específicos por linguagem/framework (Go, Python, Node.js, TypeScript, React, Vue, Angular, Rust, PHP, Laravel, Django, etc.)
+  - ✅ Detect package.json, requirements.txt, Cargo.toml, composer.json
+  - ✅ Generate customized quality.yml based on project stack
+  - ✅ Language/framework specific templates (Go, Python, Node.js, TypeScript, React, Vue, Angular, Rust, PHP, Laravel, Django, etc.)
 
-- ✅ **Validação Robusta de Configuração**
+- ✅ **Robust Configuration Validation**
 
-  - ✅ Criado `internal/config/validator.go`
-  - ✅ Validar comandos e estrutura do quality.yml
-  - ✅ Mensagens de erro detalhadas com sugestões
-  - ✅ Detecção de comandos perigosos
-  - ✅ Validação de sintaxe de comandos
+  - ✅ Created `internal/config/validator.go`
+  - ✅ Validate commands and quality.yml structure
+  - ✅ Detailed error messages with suggestions
+  - ✅ Dangerous command detection
+  - ✅ Command syntax validation
 
-- ✅ **Sistema de Detecção de Linguagens**
-  - ✅ `internal/service/language_detector.go` - Análise automática de estrutura do projeto
-  - ✅ `internal/service/templates.go` - Templates específicos por stack
-  - ✅ Suporte a mais de 15 linguagens e frameworks
-  - ✅ Testes unitários completos (cobertura > 95%)
+- ✅ **Language Detection System**
+  - ✅ `internal/service/language_detector.go` - Automatic project structure analysis
+  - ✅ `internal/service/templates.go` - Stack-specific templates
+  - ✅ Support for 15+ languages and frameworks
+  - ✅ Complete unit tests (coverage > 95%)
 
-### 🏗️ Sprint 3: Robustez (Futuro Próximo)
+### 🏗️ Sprint 3: Robustness (Near Future)
 
-- [ ] **Sistema de Logs Estruturados**
+- [ ] **Structured Logging System**
 
-  - Implementar com `logrus` ou `zap`
-  - Níveis configuráveis (debug, info, warn, error)
-  - Logs para troubleshooting
+  - Implement with `logrus` or `zap`
+  - Configurable levels (debug, info, warn, error)
+  - Logs for troubleshooting
 
-- [ ] **Error Handling Avançado**
-  - Error wrapping detalhado
-  - Mensagens informativas com contexto
-  - Sugestões de correção
+- [ ] **Advanced Error Handling**
+  - Detailed error wrapping
+  - Informative messages with context
+  - Correction suggestions
 
-### 🚀 Sprint 4+: Funcionalidades Avançadas
+### 🚀 Sprint 4+: Advanced Features
 
-#### Extensibilidade (30% 🔴)
+#### Extensibility (30% 🔴)
 
-- [ ] **REST API**: Handlers HTTP para integração
-- [ ] **Webhook Support**: Notificações para sistemas externos
-- [ ] **Plugin System**: Arquitetura extensível
+- [ ] **REST API**: HTTP handlers for integration
+- [ ] **Webhook Support**: Notifications to external systems
+- [ ] **Plugin System**: Extensible architecture
 
-#### Qualidade e Testes (75% ✅)
+#### Quality and Testing (75% ✅)
 
-- [ ] **Testes E2E**: Validação de fluxos completos
+- [ ] **E2E Tests**: Complete flow validation
 - [ ] **Benchmarks**: Performance testing
-- [ ] **Utilities Package**: Biblioteca em `/pkg`
+- [ ] **Utilities Package**: Library in `/pkg`
 
 #### Developer Experience (60% 🔶)
 
-- [ ] **Interactive Mode**: Configuração guiada
-- [ ] **Auto-update**: Sistema de atualização
-- [ ] **Template System**: Templates para stacks populares
+- [ ] **Interactive Mode**: Guided configuration
+- [ ] **Auto-update**: Update system
+- [ ] **Template System**: Templates for popular stacks
 
-## 📈 Métricas de Completude
+## 📈 Completion Metrics
 
-| Categoria           | Antes Sprint 1 | Depois Sprint 1 | Meta |
-| ------------------- | -------------- | --------------- | ---- |
-| **Core Features**   | 100% ✅        | 100% ✅         | ✅   |
-| **Bug Fixes**       | 85%            | 100% ✅         | ✅   |
-| **User Experience** | 40%            | 95% ✅          | 90%  |
-| **Robustez**        | 70%            | 90% ✅          | 90%  |
-| **Extensibilidade** | 20%            | 30% 🔴          | 70%  |
-| **Testes**          | 70%            | 95% ✅          | 95%  |
+| Category            | Before Sprint 1 | After Sprint 1 | Goal |
+| ------------------- | --------------- | -------------- | ---- |
+| **Core Features**   | 100% ✅         | 100% ✅        | ✅   |
+| **Bug Fixes**       | 85%             | 100% ✅        | ✅   |
+| **User Experience** | 40%             | 95% ✅         | 90%  |
+| **Robustness**      | 70%             | 90% ✅         | 90%  |
+| **Extensibility**   | 20%             | 30% 🔴         | 70%  |
+| **Tests**           | 70%             | 95% ✅         | 95%  |
 
-## 🎯 Objetivos por Release
+## 🎯 Objectives per Release
 
-### v1.1.x - UX e Estabilidade ✅
+### v1.1.x - UX and Stability ✅
 
-- [x] JSON output limpo e funcional
-- [x] Spinners e indicadores visuais
-- [x] Timing de execução
-- [x] Detecção inteligente de shell
+- [x] Clean and functional JSON output
+- [x] Spinners and visual indicators
+- [x] Execution timing
+- [x] Intelligent shell detection
 
-### v1.2.x - Análise Inteligente ✅
+### v1.2.x - Intelligent Analysis ✅
 
-- [x] `--init` que analisa estrutura do projeto
-- [x] Validação robusta de configuração
-- [x] Formatação com cores avançada
+- [x] `--init` that analyzes project structure
+- [x] Robust configuration validation
+- [x] Advanced color formatting
 
-### v1.3.x - Robustez e Logs
+### v1.3.x - Robustness and Logs
 
-- [ ] Sistema de logging estruturado
-- [ ] Error handling avançado
-- [ ] Testes end-to-end completos
+- [ ] Structured logging system
+- [ ] Advanced error handling
+- [ ] Complete end-to-end tests
 
-### v2.0.x - Extensibilidade
+### v2.0.x - Extensibility
 
-- [ ] REST API para integração
-- [ ] Sistema de plugins
+- [ ] REST API for integration
+- [ ] Plugin system
 - [ ] Interactive mode
 
-## 🔧 Como Contribuir
+## 🔧 How to Contribute
 
-### Pegue uma Task
+### Pick a Task
 
-1. Escolha um item marcado como `[ ]` acima
-2. Crie branch: `git checkout -b feature/task-name`
-3. Implemente seguindo Clean Architecture
-4. Adicione testes
-5. Abra PR com descrição detalhada
+1. Choose an item marked as `[ ]` above
+2. Create branch: `git checkout -b feature/task-name`
+3. Implement following Clean Architecture
+4. Add tests
+5. Open PR with detailed description
 
-### Padrões de Código
+### Code Standards
 
-- **Arquitetura**: Manter separação domain/service/infra/repository
-- **Testes**: Cobrir código novo com testes unitários
-- **Interfaces**: Usar interfaces para desacoplamento
+- **Architecture**: Maintain domain/service/infra/repository separation
+- **Tests**: Cover new code with unit tests
+- **Interfaces**: Use interfaces for decoupling
 - **Commits**: Conventional commits (`feat:`, `fix:`, `docs:`)
 
-### Comandos de Desenvolvimento
+### Development Commands
 
 ```bash
 # Setup
@@ -162,7 +162,7 @@ go build -o quality-gate ./cmd/quality-gate
 # Test
 go test ./...
 
-# Test específico
+# Specific test
 go test ./internal/service -v
 
 # Run local
@@ -171,58 +171,58 @@ go test ./internal/service -v
 ./quality-gate pre-commit
 ```
 
-## 📅 Timeline Estimado
+## 📅 Estimated Timeline
 
-- **Sprint 2** (1-2 semanas): Análise inteligente + validação
-- **Sprint 3** (1-2 semanas): Logs estruturados + error handling
-- **Sprint 4+** (contínuo): Extensibilidade e funcionalidades avançadas
+- **Sprint 2** (1-2 weeks): Intelligent analysis + validation
+- **Sprint 3** (1-2 weeks): Structured logs + error handling
+- **Sprint 4+** (ongoing): Extensibility and advanced features
 
 ---
 
-**Última atualização**: 21 de outubro de 2025  
-**Versão atual**: v1.2.x (Sprint 2 completo - Análise Inteligente)
+**Last update**: October 21st, 2025  
+**Current version**: v1.2.x (Sprint 2 complete - Intelligent Analysis)
 
-## 🎉 Sprint 2 - CONCLUÍDO!
+## 🎉 Sprint 2 - COMPLETED
 
-A Sprint 2 foi **100% concluída** com sucesso! As funcionalidades implementadas incluem:
+Sprint 2 was **100% successfully completed**! The implemented features include:
 
-### ✨ Principais Features Entregues
+### ✨ Main Features Delivered
 
-1. **🧠 Análise Inteligente de Projetos**
+1. **🧠 Intelligent Project Analysis**
 
-   - Detector automático de linguagens e frameworks
-   - Suporte a Go, Python, Node.js, TypeScript, React, Vue, Angular, Rust, PHP, Laravel, Django
-   - Geração de `quality.yml` customizado baseado na stack detectada
+   - Automatic language and framework detector
+   - Support for Go, Python, Node.js, TypeScript, React, Vue, Angular, Rust, PHP, Laravel, Django
+   - Customized `quality.yml` generation based on detected stack
 
-2. **🛡️ Validação Robusta**
+2. **🛡️ Robust Validation**
 
-   - Validador completo de configuração com detecção de erros críticos
-   - Verificação de segurança para comandos perigosos
-   - Mensagens de erro detalhadas com sugestões de correção
+   - Complete configuration validator with critical error detection
+   - Security verification for dangerous commands
+   - Detailed error messages with correction suggestions
 
-3. **🧪 Cobertura de Testes Expandida**
-   - Testes unitários para todas as novas funcionalidades
-   - Cobertura de testes > 95%
-   - Testes para detector, templates e validador
+3. **🧪 Expanded Test Coverage**
+   - Unit tests for all new features
+   - Test coverage > 95%
+   - Tests for detector, templates and validator
 
-### 📊 Comparação: Antes vs Depois da Sprint 2
+### 📊 Comparison: Before vs After Sprint 2
 
-| Funcionalidade           | Antes         | Depois Sprint 2                             | Status |
-| ------------------------ | ------------- | ------------------------------------------- | ------ |
-| **Init Inteligente**     | Template fixo | Análise automática + templates customizados | ✅     |
-| **Validação**            | Básica        | Robusta com segurança e sugestões           | ✅     |
-| **Suporte a Linguagens** | 3 linguagens  | 15+ linguagens/frameworks                   | ✅     |
-| **User Experience**      | 85%           | 95%                                         | ✅     |
-| **Robustez**             | 75%           | 90%                                         | ✅     |
+| Feature              | Before         | After Sprint 2                            | Status |
+| -------------------- | -------------- | ----------------------------------------- | ------ |
+| **Intelligent Init** | Fixed template | Automatic analysis + customized templates | ✅     |
+| **Validation**       | Basic          | Robust with security and suggestions      | ✅     |
+| **Language Support** | 3 languages    | 15+ languages/frameworks                  | ✅     |
+| **User Experience**  | 85%            | 95%                                       | ✅     |
+| **Robustness**       | 75%            | 90%                                       | ✅     |
 
-### 🚀 Demonstração
+### 🚀 Demonstration
 
 ```bash
-# Análise inteligente em ação
+# Intelligent analysis in action
 ./quality-gate --init
 
-# Resultado: quality.yml customizado para seu projeto!
-# ✅ Detecta Go, Python, Node.js, etc. automaticamente
-# ✅ Inclui ferramentas específicas da sua stack
-# ✅ Configura hooks relevantes para seu projeto
+# Result: customized quality.yml for your project!
+# ✅ Detects Go, Python, Node.js, etc. automatically
+# ✅ Includes tools specific to your stack
+# ✅ Configures hooks relevant to your project
 ```
