@@ -5,94 +5,17 @@ on:
         tags:
             - "v*"
 
+permissions:
+    contents: write
+    packages: write
+
 env:
     GO_VERSION: "1.24"
 
 jobs:
-    create-release:
-        name: Create Release
+    release:
+        name: Build and Release
         runs-on: ubuntu-latest
-        outputs:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            release_id: ${{ steps.create_release.outputs.id }}
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Get version from tag
-              id: get_version
-              run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-            - name: Create Release
-              id: create_release
-              uses: actions/create-release@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ steps.get_version.outputs.VERSION }}
-                  release_name: Release ${{ steps.get_version.outputs.VERSION }}
-                  body: |
-                      ## Changes
-
-                      See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-
-                      ## Installation
-
-                      ### Download Binary
-
-                      Download the appropriate binary for your platform from the assets below.
-
-                      ### Using Go Install
-
-                      ```bash
-                      go install github.com/dmux/go-quality-gate/cmd/quality-gate@${{ steps.get_version.outputs.VERSION }}
-                      ```
-
-                      ### Using Homebrew (macOS/Linux)
-
-                      ```bash
-                      # If you have a homebrew tap configured
-                      brew install quality-gate
-                      ```
-
-                      ## Usage
-
-                      ```bash
-                      # Initialize quality gate in your project
-                      quality-gate --init
-
-                      # Install git hooks
-                      quality-gate --install
-
-                      # Check version
-                      quality-gate -v
-                      ```
-                  draft: false
-                  prerelease: false
-
-    build-and-upload:
-        name: Build and Upload
-        runs-on: ubuntu-latest
-        needs: create-release
-        strategy:
-            matrix:
-                include:
-                    - goos: linux
-                      goarch: amd64
-                      suffix: linux-amd64
-                    - goos: linux
-                      goarch: arm64
-                      suffix: linux-arm64
-                    - goos: darwin
-                      goarch: amd64
-                      suffix: darwin-amd64
-                    - goos: darwin
-                      goarch: arm64
-                      suffix: darwin-arm64
-                    - goos: windows
-                      goarch: amd64
-                      suffix: windows-amd64
-                      extension: .exe
 
         steps:
             - uses: actions/checkout@v4
@@ -101,6 +24,13 @@ jobs:
               uses: actions/setup-go@v5
               with:
                   go-version: ${{ env.GO_VERSION }}
+
+            - name: Get version and build info
+              id: build_info
+              run: |
+                  echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+                  echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+                  echo "GIT_COMMIT=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
 
             - name: Cache Go modules
               uses: actions/cache@v4
@@ -115,65 +45,127 @@ jobs:
             - name: Download dependencies
               run: go mod download
 
-            - name: Get version and build info
-              id: build_info
+            - name: Build binaries for all platforms
+              env:
+                  VERSION: ${{ steps.build_info.outputs.VERSION }}
+                  BUILD_DATE: ${{ steps.build_info.outputs.BUILD_DATE }}
+                  GIT_COMMIT: ${{ steps.build_info.outputs.GIT_COMMIT }}
               run: |
-                  echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-                  echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-                  echo "GIT_COMMIT=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+                  # Build configurations
+                  declare -a configs=(
+                      "linux:amd64"
+                      "linux:arm64"
+                      "darwin:amd64"
+                      "darwin:arm64"
+                      "windows:amd64"
+                  )
 
-            - name: Set binary name
-              id: binary_name
-              run: echo "name=quality-gate-${{ matrix.suffix }}${{ matrix.extension }}" >> $GITHUB_OUTPUT
+                  # Create builds directory
+                  mkdir -p builds
 
-            - name: Build binary
+                  # Build for each configuration
+                  for config in "${configs[@]}"; do
+                      IFS=':' read -r goos goarch <<< "$config"
+                      
+                      EXTENSION=""
+                      if [[ "$goos" == "windows" ]]; then
+                          EXTENSION=".exe"
+                      fi
+                      
+                      BINARY_NAME="quality-gate-${goos}-${goarch}${EXTENSION}"
+                      
+                      echo "Building ${BINARY_NAME} for ${goos}/${goarch}..."
+                      
+                      GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 go build \
+                          -ldflags "-X main.Version=${VERSION} -X main.BuildDate=${BUILD_DATE} -X main.GitCommit=${GIT_COMMIT} -s -w" \
+                          -o "builds/${BINARY_NAME}" ./cmd/quality-gate
+                      
+                      # Generate checksum
+                      cd builds
+                      sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+                      cd ..
+                      
+                      echo "✅ Built ${BINARY_NAME}"
+                  done
+
+                  ls -la builds/
+
+            - name: Create Release with GitHub CLI
               env:
-                  GOOS: ${{ matrix.goos }}
-                  GOARCH: ${{ matrix.goarch }}
-                  CGO_ENABLED: 0
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ steps.build_info.outputs.VERSION }}
               run: |
-                  BINARY_NAME="${{ steps.binary_name.outputs.name }}"
-                  LDFLAGS="-ldflags \"-X main.Version=${{ steps.build_info.outputs.VERSION }} -X main.BuildDate=${{ steps.build_info.outputs.BUILD_DATE }} -X main.GitCommit=${{ steps.build_info.outputs.GIT_COMMIT }} -s -w\""
+                  # Create release notes
+                  cat > release-notes.md << EOF
+                  ## Changes
 
-                  echo "Building ${BINARY_NAME} for ${GOOS}/${GOARCH}..."
-                  go build ${LDFLAGS} -o ${BINARY_NAME} ./cmd/quality-gate
+                  See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
 
-                  # Create checksum
-                  if command -v sha256sum > /dev/null; then
-                    sha256sum ${BINARY_NAME} > ${BINARY_NAME}.sha256
-                  else
-                    shasum -a 256 ${BINARY_NAME} > ${BINARY_NAME}.sha256
-                  fi
+                  ## Installation
 
-                  # Make executable (for Unix systems)
-                  if [[ "${{ matrix.goos }}" != "windows" ]]; then
-                    chmod +x ${BINARY_NAME}
-                  fi
+                  ### Download Binary
 
-            - name: Upload Release Asset
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ needs.create-release.outputs.upload_url }}
-                  asset_path: ./${{ steps.binary_name.outputs.name }}
-                  asset_name: ${{ steps.binary_name.outputs.name }}
-                  asset_content_type: application/octet-stream
+                  Download the appropriate binary for your platform from the assets below:
 
-            - name: Upload Checksum
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ needs.create-release.outputs.upload_url }}
-                  asset_path: ./${{ steps.binary_name.outputs.name }}.sha256
-                  asset_name: ${{ steps.binary_name.outputs.name }}.sha256
-                  asset_content_type: text/plain
+                  **Linux:**
+                  - [quality-gate-linux-amd64](https://github.com/${{ github.repository }}/releases/download/${VERSION}/quality-gate-linux-amd64) (Intel/AMD 64-bit)
+                  - [quality-gate-linux-arm64](https://github.com/${{ github.repository }}/releases/download/${VERSION}/quality-gate-linux-arm64) (ARM 64-bit)
+
+                  **macOS:**
+                  - [quality-gate-darwin-amd64](https://github.com/${{ github.repository }}/releases/download/${VERSION}/quality-gate-darwin-amd64) (Intel Mac)
+                  - [quality-gate-darwin-arm64](https://github.com/${{ github.repository }}/releases/download/${VERSION}/quality-gate-darwin-arm64) (Apple Silicon)
+
+                  **Windows:**
+                  - [quality-gate-windows-amd64.exe](https://github.com/${{ github.repository }}/releases/download/${VERSION}/quality-gate-windows-amd64.exe) (64-bit)
+
+                  ### Using Go Install
+
+                  \`\`\`bash
+                  go install github.com/dmux/go-quality-gate/cmd/quality-gate@${VERSION}
+                  \`\`\`
+
+                  ### Using Docker
+
+                  \`\`\`bash
+                  docker run --rm ghcr.io/dmux/go-quality-gate:${VERSION#v} --version
+                  \`\`\`
+
+                  ## Usage
+
+                  \`\`\`bash
+                  # Initialize quality gate in your project
+                  quality-gate --init
+
+                  # Install git hooks
+                  quality-gate --install
+
+                  # Check version
+                  quality-gate -v
+                  \`\`\`
+
+                  ## Verification
+
+                  All binaries include SHA256 checksums for integrity verification:
+
+                  \`\`\`bash
+                  # Linux/macOS
+                  sha256sum -c quality-gate-linux-amd64.sha256
+
+                  # macOS (alternative)
+                  shasum -a 256 -c quality-gate-darwin-amd64.sha256
+                  \`\`\`
+                  EOF
+
+                  # Create release
+                  gh release create "${VERSION}" \
+                      --title "Release ${VERSION}" \
+                      --notes-file release-notes.md \
+                      builds/*
 
     build-docker:
         name: Build and Push Docker Image
         runs-on: ubuntu-latest
-        needs: create-release
+        needs: release
 
         steps:
             - uses: actions/checkout@v4
