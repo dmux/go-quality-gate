@@ -1,0 +1,12 @@
+tools:
+  - name: "Gitleaks"
+    check_command: "gitleaks version"
+    install_command: "go install github.com/zricethezav/gitleaks/v8@latest"
+
+hooks:
+  security:
+    pre-commit:
+      - name: "🔒 Verificação de Segredos (Gitleaks)"
+        command: "gitleaks detect --no-git --source . --verbose"
+        output_rules:
+          on_failure_message: "Vazamento de segredo detectado! Revise o código antes de comitar."
