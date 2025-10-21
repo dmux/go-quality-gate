@@ -15,16 +15,16 @@ type SpinnerManager interface {
 
 // ConsoleSpinnerManager manages console spinners
 type ConsoleSpinnerManager struct {
-	spinner   *spinner.Spinner
-	jsonMode  bool
-	isActive  bool
+	spinner  *spinner.Spinner
+	jsonMode bool
+	isActive bool
 }
 
 // NewConsoleSpinnerManager creates a new spinner manager
 func NewConsoleSpinnerManager(jsonMode bool) *ConsoleSpinnerManager {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	s.Color("cyan")
-	
+
 	return &ConsoleSpinnerManager{
 		spinner:  s,
 		jsonMode: jsonMode,
@@ -37,7 +37,7 @@ func (s *ConsoleSpinnerManager) Start(message string) {
 	if s.jsonMode {
 		return // Don't show spinners in JSON mode
 	}
-	
+
 	s.spinner.Suffix = " " + message
 	s.spinner.Start()
 	s.isActive = true
@@ -56,6 +56,6 @@ func (s *ConsoleSpinnerManager) UpdateMessage(message string) {
 	if s.jsonMode || !s.isActive {
 		return
 	}
-	
+
 	s.spinner.Suffix = " " + message
 }

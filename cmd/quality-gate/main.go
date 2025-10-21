@@ -141,7 +141,7 @@ func main() {
 	}
 
 	results, err := qualityGate.Run(cfg, hookType)
-	
+
 	overallStatus := "success"
 	if err != nil {
 		overallStatus = "failure"
@@ -160,7 +160,7 @@ func main() {
 			DurationMs   int64       `json:"duration_ms"`
 			DurationText string      `json:"duration"`
 		}
-		
+
 		var jsonResults []JSONResult
 		for _, result := range results {
 			jsonResults = append(jsonResults, JSONResult{
@@ -171,12 +171,12 @@ func main() {
 				DurationText: result.Duration.Round(time.Millisecond).String(),
 			})
 		}
-		
+
 		jsonOutput := struct {
 			Status  string       `json:"status"`
 			Results []JSONResult `json:"results"`
 		}{
-			Status: overallStatus,
+			Status:  overallStatus,
 			Results: jsonResults,
 		}
 		jsonBytes, marshalErr := json.MarshalIndent(jsonOutput, "", "  ")

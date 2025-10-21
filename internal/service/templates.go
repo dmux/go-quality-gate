@@ -28,12 +28,12 @@ type HookTemplate struct {
 
 // CommandTemplate represents a command in a hook
 type CommandTemplate struct {
-	Name              string            `yaml:"name"`
-	Command           string            `yaml:"command"`
-	FixCommand        string            `yaml:"fix_command,omitempty"`
-	OutputRules       map[string]string `yaml:"output_rules,omitempty"`
-	WorkingDirectory  string            `yaml:"working_directory,omitempty"`
-	RequiredFiles     []string          `yaml:"required_files,omitempty"`
+	Name             string            `yaml:"name"`
+	Command          string            `yaml:"command"`
+	FixCommand       string            `yaml:"fix_command,omitempty"`
+	OutputRules      map[string]string `yaml:"output_rules,omitempty"`
+	WorkingDirectory string            `yaml:"working_directory,omitempty"`
+	RequiredFiles    []string          `yaml:"required_files,omitempty"`
 }
 
 // TemplateGenerator generates quality.yml content based on detected project structure

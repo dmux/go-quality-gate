@@ -16,8 +16,6 @@ type MockShellRunner struct {
 	}
 }
 
-
-
 // Run implements the ShellRunner interface.
 
 func (r *MockShellRunner) Run(command string) (string, error) {

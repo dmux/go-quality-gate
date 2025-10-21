@@ -7,10 +7,10 @@ import "fmt"
 var (
 	// Version is the current version of the quality-gate tool
 	Version = "1.2.0-dev"
-	
+
 	// BuildDate is set during build time
 	BuildDate = "development"
-	
+
 	// GitCommit is set during build time
 	GitCommit = "development"
 )

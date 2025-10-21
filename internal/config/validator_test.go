@@ -85,7 +85,7 @@ func TestConfigValidator_Validate(t *testing.T) {
 		validator := NewConfigValidator(config)
 		// Skip filesystem validation for unit tests
 		result := &ValidationResult{Valid: true, Errors: []ValidationError{}}
-		
+
 		// Validate only the core parts, skip filesystem checks
 		validator.validateTools(result)
 		validator.validateHooks(result)
@@ -103,7 +103,7 @@ func TestConfigValidator_Validate(t *testing.T) {
 
 		// Update result validity based on critical/error presence
 		result.Valid = !hasCriticalOrError
-		
+
 		if !result.Valid {
 			t.Errorf("Expected valid config to pass validation")
 		}
@@ -114,7 +114,7 @@ func TestConfigValidator_Validate(t *testing.T) {
 			Tools: []Tool{
 				{
 					Name:           "", // Empty name - error
-					CheckCommand:   "",  // Empty check command - error
+					CheckCommand:   "", // Empty check command - error
 					InstallCommand: "pip install something",
 				},
 				{

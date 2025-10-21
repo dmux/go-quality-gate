@@ -26,11 +26,11 @@ func (s *HookRunnerService) RunFixCommand(hook domain.Hook) (string, error) {
 	if hook.FixCommand == "" {
 		return "", fmt.Errorf("no fix command defined for hook: %s", hook.Name)
 	}
-	
+
 	s.logger.StartSpinner(fmt.Sprintf("Running fix command for %s...", hook.Name))
 	output, err := s.shellRunner.Run(hook.FixCommand)
 	s.logger.StopSpinner()
-	
+
 	if err != nil {
 		return output, fmt.Errorf("failed to run fix command for %s: %w\n%s", hook.Name, err, output)
 	}
@@ -45,11 +45,11 @@ func (s *HookRunnerService) RunHooks(hooks []domain.Hook) []domain.ExecutionResu
 
 	for _, hook := range hooks {
 		s.logger.StartSpinner(fmt.Sprintf("Running %s...", hook.Name))
-		
+
 		startTime := time.Now()
 		output, err := s.shellRunner.Run(hook.Command)
 		duration := time.Since(startTime)
-		
+
 		s.logger.StopSpinner()
 
 		result := domain.ExecutionResult{

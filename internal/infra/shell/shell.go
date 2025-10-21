@@ -24,7 +24,7 @@ func getPreferredShell() string {
 	if shell := os.Getenv("SHELL"); shell != "" {
 		return shell
 	}
-	
+
 	// Try common shells in order of preference
 	shells := []string{"/bin/zsh", "/bin/bash", "/bin/sh"}
 	for _, shell := range shells {
@@ -32,7 +32,7 @@ func getPreferredShell() string {
 			return shell
 		}
 	}
-	
+
 	// Default fallback
 	return "bash"
 }

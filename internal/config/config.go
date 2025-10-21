@@ -16,13 +16,13 @@ type Tool struct {
 type Hooks map[string]map[string][]Hook
 
 type Hook struct {
-	Name          string       `yaml:"name"`
-	Command       string       `yaml:"command"`
-	FixCommand    string       `yaml:"fix_command,omitempty"`
-	OutputRules   OutputRules  `yaml:"output_rules,omitempty"`
+	Name        string      `yaml:"name"`
+	Command     string      `yaml:"command"`
+	FixCommand  string      `yaml:"fix_command,omitempty"`
+	OutputRules OutputRules `yaml:"output_rules,omitempty"`
 }
 
 type OutputRules struct {
-	ShowOn         string `yaml:"show_on,omitempty"`
+	ShowOn           string `yaml:"show_on,omitempty"`
 	OnFailureMessage string `yaml:"on_failure_message,omitempty"`
 }

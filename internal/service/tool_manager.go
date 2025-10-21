@@ -27,22 +27,22 @@ func NewToolManagerService(shellRunner repository.ShellRunner, logger logger.Log
 func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool) error {
 	for _, tool := range tools {
 		s.logger.StartSpinner(fmt.Sprintf("Checking if %s is installed...", tool.Name))
-		
+
 		startTime := time.Now()
 		_, err := s.shellRunner.Run(tool.CheckCommand)
 		checkDuration := time.Since(startTime)
-		
+
 		s.logger.StopSpinner()
-		
+
 		if err != nil {
 			s.logger.StartSpinner(fmt.Sprintf("Installing %s...", tool.Name))
-			
+
 			installStartTime := time.Now()
 			output, err := s.shellRunner.Run(tool.InstallCommand)
 			installDuration := time.Since(installStartTime)
-			
+
 			s.logger.StopSpinner()
-			
+
 			if err != nil {
 				return fmt.Errorf("failed to install %s: %w\n%s", tool.Name, err, output)
 			}

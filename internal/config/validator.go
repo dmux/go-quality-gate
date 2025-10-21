@@ -10,11 +10,11 @@ import (
 
 // ValidationError represents a configuration validation error
 type ValidationError struct {
-	Field       string
-	Value       string
-	Issue       string
-	Suggestion  string
-	Severity    ValidationSeverity
+	Field      string
+	Value      string
+	Issue      string
+	Suggestion string
+	Severity   ValidationSeverity
 }
 
 // ValidationSeverity indicates the severity of a validation issue
@@ -243,15 +243,15 @@ func (v *ConfigValidator) validateCommands(commands []Hook, fieldPrefix string, 
 func (v *ConfigValidator) validateCommand(command, fieldPath string, result *ValidationResult) {
 	// Check for potentially dangerous commands
 	dangerousPatterns := []string{
-		`rm\s+-rf\s+/`,           // Dangerous rm commands
-		`rm\s+-rf\s+\*`,          // Wildcard deletion
-		`sudo\s+rm`,              // Sudo deletion
-		`>\s*/dev/sd[a-z]`,       // Writing to disk devices
-		`dd\s+.*of=/dev`,         // DD to devices
-		`curl.*\|\s*sh`,          // Piping curl to shell
-		`wget.*\|\s*sh`,          // Piping wget to shell
-		`eval\s+\$\(.*curl`,      // Eval with curl
-		`:\(\)\{.*;\}:`,          // Fork bomb pattern
+		`rm\s+-rf\s+/`,      // Dangerous rm commands
+		`rm\s+-rf\s+\*`,     // Wildcard deletion
+		`sudo\s+rm`,         // Sudo deletion
+		`>\s*/dev/sd[a-z]`,  // Writing to disk devices
+		`dd\s+.*of=/dev`,    // DD to devices
+		`curl.*\|\s*sh`,     // Piping curl to shell
+		`wget.*\|\s*sh`,     // Piping wget to shell
+		`eval\s+\$\(.*curl`, // Eval with curl
+		`:\(\)\{.*;\}:`,     // Fork bomb pattern
 	}
 
 	for _, pattern := range dangerousPatterns {
@@ -304,19 +304,19 @@ func (v *ConfigValidator) validateCommandSyntax(command, fieldPath string, resul
 // validateToolNames checks for common typos in tool names
 func (v *ConfigValidator) validateToolNames(command, fieldPath string, result *ValidationResult) {
 	commonTypos := map[string]string{
-		"prettier":     "prettier",
-		"pretier":      "prettier",
-		"pretter":      "prettier",
-		"eslint":       "eslint",
-		"esslint":      "eslint",
-		"eslinter":     "eslint",
-		"pytest":       "pytest",
-		"py.test":      "pytest",
-		"ruf":          "ruff",
-		"ruff ":        "ruff",
-		"gofmt ":       "gofmt",
-		"go fmt":       "gofmt",
-		"golangci":     "golangci-lint",
+		"prettier":      "prettier",
+		"pretier":       "prettier",
+		"pretter":       "prettier",
+		"eslint":        "eslint",
+		"esslint":       "eslint",
+		"eslinter":      "eslint",
+		"pytest":        "pytest",
+		"py.test":       "pytest",
+		"ruf":           "ruff",
+		"ruff ":         "ruff",
+		"gofmt ":        "gofmt",
+		"go fmt":        "gofmt",
+		"golangci":      "golangci-lint",
 		"golangci-lint": "golangci-lint",
 	}
 
@@ -427,7 +427,7 @@ func (v *ConfigValidator) checkCommandToolReferences(commands []Hook, availableT
 
 	for i, cmd := range commands {
 		cmdFieldPrefix := fmt.Sprintf("%s[%d]", fieldPrefix, i)
-		
+
 		// Extract command name
 		parts := strings.Fields(cmd.Command)
 		if len(parts) == 0 {
@@ -493,7 +493,7 @@ func (v *ConfigValidator) validateDuplicateHookGroups(result *ValidationResult) 
 // validateEssentialHooks suggests essential hooks that might be missing
 func (v *ConfigValidator) validateEssentialHooks(result *ValidationResult) {
 	hasSecurityHooks := false
-	
+
 	for hookName := range v.config.Hooks {
 		if strings.Contains(strings.ToLower(hookName), "security") {
 			hasSecurityHooks = true
@@ -586,10 +586,10 @@ func (r *ValidationResult) GetFormattedErrors() string {
 // GetErrorsBySeverity returns errors grouped by severity
 func (r *ValidationResult) GetErrorsBySeverity() map[ValidationSeverity][]ValidationError {
 	result := make(map[ValidationSeverity][]ValidationError)
-	
+
 	for _, err := range r.Errors {
 		result[err.Severity] = append(result[err.Severity], err)
 	}
-	
+
 	return result
 }
