@@ -34,7 +34,7 @@ ehthumbs.db
 Thumbs.db
 
 # Built binary
-quality-gate
+./quality-gate
 
 # Test coverage
 coverage.txt

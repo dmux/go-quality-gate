@@ -1,63 +1,148 @@
 package service
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 )
 
-const (
-	qualityYmlContent = `tools:
-  - name: "Gitleaks"
-    check_command: "gitleaks version"
-    install_command: "go install github.com/zricethezav/gitleaks/v8@latest"
-  - name: "Ruff (Python Linter/Formatter)"
-    check_command: "ruff --version"
-    install_command: "pip install ruff"
-  - name: "Prettier (Code Formatter)"
-    check_command: "npx prettier --version"
-    install_command: "npm install --global prettier"
-
-hooks:
-  security:
-    pre-commit:
-      - name: "🔒 Verificação de Segredos (Gitleaks)"
-        command: "gitleaks detect --no-git --source . --verbose"
-        output_rules:
-          on_failure_message: "Vazamento de segredo detectado! Revise o código antes de comitar."
-
-  python-backend:
-    pre-commit:
-      - name: "🎨 Verificação de Formato (Ruff)"
-        command: "ruff format ./backend --check"
-        fix_command: "ruff format ./backend"
-        output_rules:
-          show_on: failure 
-          on_failure_message: "Código fora do padrão. Execute './quality-gate --fix' para corrigir."
-
-      - name: "🧪 Testes (Pytest)"
-        command: "pytest ./backend"
-        output_rules:
-          show_on: always 
-
-  typescript-frontend:
-    pre-commit:
-      - name: "🎨 Formatação (Prettier)"
-        command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
-        fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
-`
-)
-
-// InitService is responsible for initializing the quality.yml file.
-
-type InitService struct{}
-
-// NewInitService creates a new InitService.
-
-func NewInitService() *InitService {
-	return &InitService{}
+// InitService is responsible for initializing the quality.yml file with intelligent analysis.
+type InitService struct {
+	detector  *LanguageDetector
+	generator *TemplateGenerator
 }
 
-// Init creates the quality.yml file.
+// NewInitService creates a new InitService with intelligent project analysis.
+func NewInitService() *InitService {
+	projectPath, _ := os.Getwd() // Default to current directory
+	return &InitService{
+		detector:  NewLanguageDetector(projectPath),
+		generator: NewTemplateGenerator(),
+	}
+}
 
+// NewInitServiceWithPath creates a new InitService for a specific project path.
+func NewInitServiceWithPath(projectPath string) *InitService {
+	return &InitService{
+		detector:  NewLanguageDetector(projectPath),
+		generator: NewTemplateGenerator(),
+	}
+}
+
+// Init creates the quality.yml file with intelligent project analysis.
 func (s *InitService) Init() error {
-	return os.WriteFile("quality.yml", []byte(qualityYmlContent), 0644)
+	return s.InitWithOptions(InitOptions{
+		OutputPath: "quality.yml",
+		Verbose:    false,
+	})
+}
+
+// InitOptions provides configuration options for initialization
+type InitOptions struct {
+	OutputPath string
+	Verbose    bool
+	Force      bool // Overwrite existing file
+}
+
+// InitWithOptions creates the quality.yml file with specified options.
+func (s *InitService) InitWithOptions(opts InitOptions) error {
+	// Check if file already exists
+	if !opts.Force {
+		if _, err := os.Stat(opts.OutputPath); err == nil {
+			return fmt.Errorf("quality.yml already exists. Use --force to overwrite")
+		}
+	}
+
+	// Detect project structure
+	if opts.Verbose {
+		fmt.Println("🔍 Analyzing project structure...")
+	}
+
+	structure, err := s.detector.DetectProjectStructure()
+	if err != nil {
+		return fmt.Errorf("failed to analyze project structure: %w", err)
+	}
+
+	if opts.Verbose {
+		s.printDetectedStructure(structure)
+	}
+
+	// Generate template based on detected structure
+	if opts.Verbose {
+		fmt.Println("📝 Generating quality.yml template...")
+	}
+
+	template := s.generator.GenerateTemplate(structure)
+
+	// Write to file
+	err = os.WriteFile(opts.OutputPath, []byte(template), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write quality.yml: %w", err)
+	}
+
+	if opts.Verbose {
+		fmt.Printf("✅ Successfully created %s\n", opts.OutputPath)
+		s.printNextSteps()
+	}
+
+	return nil
+}
+
+// GetProjectAnalysis returns the detected project structure without creating a file
+func (s *InitService) GetProjectAnalysis() (*ProjectStructure, error) {
+	return s.detector.DetectProjectStructure()
+}
+
+// GeneratePreview returns the generated quality.yml content without writing to disk
+func (s *InitService) GeneratePreview() (string, error) {
+	structure, err := s.detector.DetectProjectStructure()
+	if err != nil {
+		return "", fmt.Errorf("failed to analyze project structure: %w", err)
+	}
+
+	template := s.generator.GenerateTemplate(structure)
+	return template, nil
+}
+
+// printDetectedStructure prints the detected project structure for verbose output
+func (s *InitService) printDetectedStructure(structure *ProjectStructure) {
+	fmt.Println("🎯 Detected project components:")
+
+	if len(structure.Languages) > 0 {
+		fmt.Printf("   Languages: %v\n", structure.Languages)
+	}
+
+	if len(structure.Frameworks) > 0 {
+		fmt.Printf("   Frameworks: %v\n", structure.Frameworks)
+	}
+
+	if len(structure.Tools) > 0 {
+		fmt.Printf("   Existing Tools: %v\n", structure.Tools)
+	}
+
+	// Show detected files
+	for lang, files := range structure.Structure {
+		if len(files) > 0 {
+			fmt.Printf("   %s files: %d detected\n", lang, len(files))
+			if len(files) <= 3 {
+				for _, file := range files {
+					relPath, _ := filepath.Rel(s.detector.projectPath, file)
+					fmt.Printf("     - %s\n", relPath)
+				}
+			} else {
+				relPath, _ := filepath.Rel(s.detector.projectPath, files[0])
+				fmt.Printf("     - %s (and %d more)\n", relPath, len(files)-1)
+			}
+		}
+	}
+}
+
+// printNextSteps prints helpful next steps for the user
+func (s *InitService) printNextSteps() {
+	fmt.Println("\n🚀 Next steps:")
+	fmt.Println("   1. Review and customize the generated quality.yml")
+	fmt.Println("   2. Install the required tools: ./quality-gate --install")
+	fmt.Println("   3. Set up git hooks: ./quality-gate --install-hooks")
+	fmt.Println("   4. Test the configuration: ./quality-gate pre-commit")
+	fmt.Println("\n💡 Tip: Use './quality-gate --fix' to automatically fix formatting issues")
 }

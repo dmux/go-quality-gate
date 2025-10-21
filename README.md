@@ -132,9 +132,27 @@ fix_command: "npx prettier --write 'frontend/**/\*.{ts,tsx}'"
 | Comando | Descrição | Exemplo |
 |---------|-----------|---------|
 | `--install` | Instala Git hooks no repositório | `./quality-gate --install` |
-| `--init` | Gera quality.yml inicial | `./quality-gate --init` |
+| `--init` | Gera quality.yml inicial com análise inteligente | `./quality-gate --init` |
 | `--fix` | Executa correções automáticas | `./quality-gate --fix pre-commit` |
+| `--version, -v` | Mostra informações de versão | `./quality-gate --version` |
 | `--output=json` | Output estruturado para CI/CD | `./quality-gate --output=json pre-commit` |
+
+### 📊 Informações de Versão
+
+```bash
+# Versão simples
+./quality-gate --version
+# Output: quality-gate version 1.2.0
+
+# Versão em JSON com detalhes de build
+./quality-gate --version --output json
+# Output:
+{
+  "version": "1.2.0",
+  "build_date": "2025-10-21T16:34:44Z",
+  "git_commit": "f7b01a2"
+}
+```
 
 ## 🎯 Output JSON para CI/CD
 
