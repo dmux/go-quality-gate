@@ -1,0 +1,57 @@
+# Site settings
+title: "Go Quality Gate"
+email: ""
+description: >-
+  Language-agnostic code quality control tool with Git hooks.
+  A code quality control tool built in Go, distributed as a single binary 
+  with no external runtime dependencies.
+
+baseurl: "/go-quality-gate" # O nome do seu repositório
+url: "https://dmux.github.io" # Sua URL do GitHub Pages
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+theme: minima
+
+# GitHub Pages settings
+repository: "dmux/go-quality-gate"
+
+# Navigation
+header_pages:
+  - index.md
+  - installation.md
+  - usage.md
+  - configuration.md
+  - contributing.md
+
+# Social links
+github_username: dmux
+
+# Collections
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Exclude files from processing
+exclude:
+  - ../cmd/
+  - ../internal/
+  - ../pkg/
+  - ../scripts/
+  - ../test/
+  - ../Dockerfile
+  - ../Makefile
+  - ../go.mod
+  - ../go.sum
+  - "../*.go"
+  - ../vendor/
+  - ../.git/
+  - ../.github/

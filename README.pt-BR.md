@@ -3,7 +3,7 @@
 
 <div align="center">
 
-<img src="doc/gopher.png" alt="Go Quality Gate Logo" width="400">
+<img src="docs/gopher.png" alt="Go Quality Gate Logo" width="400">
 
 # Go Quality Gate
 
