@@ -1,4 +1,16 @@
+<div align="center">
+
+<img src="doc/gopher.png" alt="Go Quality Gate Logo" width="400">
+
 # Go Quality Gate
+
+[![Go Version](https://img.shields.io/badge/Go-1.24.5+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/dmux/go-quality-gate)
+[![Code Quality](https://img.shields.io/badge/Quality-A-brightgreen)](https://github.com/dmux/go-quality-gate)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dmux/go-quality-gate/pulls)
+
+</div>
 
 **Ferramenta agnóstica de controle de qualidade com Git hooks**
 
