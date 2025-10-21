@@ -7,10 +7,11 @@
 
 # Go Quality Gate
 
-[![Go Version](https://img.shields.io/badge/Go-1.24.5+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/dmux/go-quality-gate)
-[![Code Quality](https://img.shields.io/badge/Quality-A-brightgreen)](https://github.com/dmux/go-quality-gate)
+[![CI](https://github.com/dmux/go-quality-gate/workflows/CI/badge.svg)](https://github.com/dmux/go-quality-gate/actions/workflows/ci.yml)
+[![Release](https://github.com/dmux/go-quality-gate/workflows/Release/badge.svg)](https://github.com/dmux/go-quality-gate/actions/workflows/release.yml)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io-blue?logo=docker)](https://github.com/dmux/go-quality-gate/pkgs/container/go-quality-gate)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dmux/go-quality-gate/pulls)
 
 </div>
@@ -33,13 +34,60 @@ A code quality control tool built in Go, distributed as a single binary with no 
 
 ### 1. Installation
 
+#### Option A: Download Pre-built Binary (Recommended)
+
+```bash
+# Download the latest release for your platform
+# Linux (x64)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-linux-amd64
+chmod +x quality-gate-linux-amd64
+sudo mv quality-gate-linux-amd64 /usr/local/bin/quality-gate
+
+# Linux (ARM64)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-linux-arm64
+chmod +x quality-gate-linux-arm64
+sudo mv quality-gate-linux-arm64 /usr/local/bin/quality-gate
+
+# macOS (Intel)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-darwin-amd64
+chmod +x quality-gate-darwin-amd64
+sudo mv quality-gate-darwin-amd64 /usr/local/bin/quality-gate
+
+# macOS (Apple Silicon)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-darwin-arm64
+chmod +x quality-gate-darwin-arm64
+sudo mv quality-gate-darwin-arm64 /usr/local/bin/quality-gate
+
+# Windows (download .exe from releases page)
+# https://github.com/dmux/go-quality-gate/releases/latest
+```
+
+#### Option B: Using Go Install
+
+```bash
+go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest
+```
+
+#### Option C: Using Docker
+
+```bash
+# Run directly with Docker
+docker run --rm ghcr.io/dmux/go-quality-gate:latest --version
+
+# Create alias for easier usage
+echo 'alias quality-gate="docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/dmux/go-quality-gate:latest"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### Option D: Build from Source
+
 ```bash
 # Clone and build
-git clone <repo>
+git clone https://github.com/dmux/go-quality-gate.git
 cd go-quality-gate
-go build -o quality-gate ./cmd/quality-gate
+make build
 
-# Install hooks
+# Install hooks in your project
 ./quality-gate --install
 ```
 

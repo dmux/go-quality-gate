@@ -1,0 +1,94 @@
+name: Build Test
+
+on:
+    pull_request:
+        branches: [main]
+        paths:
+            - "**/*.go"
+            - "go.mod"
+            - "go.sum"
+            - "Makefile"
+            - ".github/workflows/**"
+
+jobs:
+    build-test:
+        name: Build Test
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                include:
+                    - goos: linux
+                      goarch: amd64
+                    - goos: linux
+                      goarch: arm64
+                    - goos: darwin
+                      goarch: amd64
+                    - goos: darwin
+                      goarch: arm64
+                    - goos: windows
+                      goarch: amd64
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "1.24"
+
+            - name: Cache Go modules
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/go-build
+                      ~/go/pkg/mod
+                  key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+                  restore-keys: |
+                      ${{ runner.os }}-go-
+
+            - name: Download dependencies
+              run: go mod download
+
+            - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+              env:
+                  GOOS: ${{ matrix.goos }}
+                  GOARCH: ${{ matrix.goarch }}
+                  CGO_ENABLED: 0
+              run: |
+                  EXTENSION=""
+                  if [ "${{ matrix.goos }}" = "windows" ]; then
+                    EXTENSION=".exe"
+                  fi
+
+                  BINARY_NAME="quality-gate-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}"
+
+                  echo "Building ${BINARY_NAME}..."
+                  go build -o ${BINARY_NAME} ./cmd/quality-gate
+
+                  echo "✅ Build successful for ${{ matrix.goos }}/${{ matrix.goarch }}"
+
+                  # Show file info
+                  ls -la ${BINARY_NAME}
+
+    docker-build-test:
+        name: Docker Build Test
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Test Docker build
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  platforms: linux/amd64,linux/arm64
+                  push: false
+                  build-args: |
+                      VERSION=test
+                      BUILD_DATE=2024-01-01T00:00:00Z
+                      GIT_COMMIT=test123
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
