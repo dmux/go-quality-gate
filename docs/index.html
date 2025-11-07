@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Go Quality Gate - Language-Agnostic Code Quality Control Tool</title>
+    <meta
+      name="description"
+      content="Go Quality Gate is a code quality control tool built in Go, distributed as a single binary with no external runtime dependencies. Provides Git hooks, automatic tool setup, and multi-language support."
+    />
+    <meta
+      name="theme-color"
+      content="#0a0a0a"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVF1N58D39"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-TVF1N58D39');
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: { extend: {} },
+        darkMode: ["class", '[data-theme="dark"]'],
+      };
+    </script>
+    <style>
+      pre code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+      }
+      .fade-in {
+        animation: fade 0.5s ease-out both;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
+  >
+    <!-- Navbar -->
+    <header
+      class="sticky top-0 z-40 backdrop-blur bg-white/70 dark:bg-zinc-950/70 border-b border-zinc-200 dark:border-zinc-800"
+    >
+      <div
+        class="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <img src="./gopher.png" alt="Go Quality Gate logo" class="w-9 h-9" />
+          <span class="font-semibold tracking-tight">Go Quality Gate</span>
+        </div>
+        <nav class="hidden md:flex items-center gap-6 text-sm">
+          <a class="hover:opacity-80" href="#features">Features</a>
+          <a class="hover:opacity-80" href="#quick-start">QuickStart</a>
+          <a class="hover:opacity-80" href="#installation">Installation</a>
+          <a class="hover:opacity-80" href="#usage">Usage</a>
+          <a class="hover:opacity-80" href="#configuration">Configuration</a>
+          <a class="hover:opacity-80" href="#supported-tools">Tools</a>
+        </nav>
+        <div class="flex items-center gap-2">
+          <button
+            id="themeToggle"
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900"
+            aria-label="Toggle theme"
+          >
+            <span id="themeIcon" aria-hidden>🌙</span
+            ><span class="hidden sm:inline">Theme</span>
+          </button>
+          <a
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 text-white hover:opacity-90 dark:bg-white dark:text-zinc-900"
+            href="https://github.com/dmux/go-quality-gate"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 py-16 sm:py-20">
+      <div class="grid md:grid-cols-2 gap-10 items-center">
+        <div class="fade-in">
+          <h1 class="text-4xl md:text-6xl font-black tracking-tight">
+            <span>Language-Agnostic</span>
+            <span
+              class="block bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 bg-clip-text text-transparent"
+              >Code Quality Control</span
+            >
+          </h1>
+          <p class="mt-6 text-lg text-zinc-600 dark:text-zinc-300 max-w-prose">
+            A code quality control tool built in Go, distributed as a single binary with no external runtime dependencies. Provides Git hooks, automatic tool setup, and multi-language support with enhanced visual feedback.
+          </p>
+          <div
+            class="mt-8 flex flex-wrap items-center justify-center md:justify-start gap-3"
+          >
+            <a
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:opacity-90"
+              href="https://github.com/dmux/go-quality-gate/releases/latest"
+            >
+              Download Latest Release
+            </a>
+            <a
+              class="px-4 py-2 rounded-lg bg-zinc-900 text-white hover:opacity-90 dark:bg-white dark:text-zinc-900"
+              href="#quick-start"
+              >QuickStart</a
+            >
+            <a
+              class="px-4 py-2 rounded-lg border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              href="#features"
+              >Features</a
+            >
+          </div>
+        </div>
+        <div class="relative fade-in">
+          <div
+            class="border border-zinc-200 dark:border-zinc-800 shadow-xl rounded-2xl"
+          >
+            <div class="px-6 pt-5 pb-0 text-sm font-semibold">
+              Terminal
+            </div>
+            <div class="p-6">
+              <div class="relative">
+                <pre
+                  class="rounded-2xl bg-zinc-900 text-zinc-100 p-6 overflow-x-auto text-sm shadow-xl border border-zinc-800"
+><code><span class="text-green-400">$</span> <span id="typed-command"></span><span class="inline-block animate-pulse">▌</span></code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🏗️ Single Binary</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Zero runtime dependencies - no Python, Node.js, or external tools required. Just download and run.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🔧 Automatic Setup</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Automatically installs and configures quality tools based on your project's languages and needs.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🌍 Multi-Language Support</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Supports Go, Python, JavaScript, TypeScript, and more in the same repository with language detection.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">📊 Enhanced Observability</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Beautiful spinners, execution timing, real-time feedback, and structured JSON output for CI/CD.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🔒 Built-in Security</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Automatic secret scanning with Gitleaks integration in your commit workflow to prevent leaks.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">⚡ Native Performance</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Instant execution without interpreters. Built with Go for maximum speed and efficiency.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">� Auto-Fix Support</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Automatically fix formatting and linting issues with the <code>--fix</code> flag.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🚀 CI/CD Ready</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Clean JSON output and exit codes perfect for automation pipelines and GitHub Actions.
+          </p>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🪝 Git Hooks Integration</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Seamless integration with Git pre-commit and pre-push hooks for automated quality checks.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- QuickStart -->
+    <section id="quick-start" class="mx-auto max-w-5xl px-4 sm:px-6 py-16">
+      <div class="text-center max-w-2xl mx-auto">
+        <h2 class="text-3xl font-extrabold tracking-tight">� QuickStart</h2>
+        <p class="mt-3 text-zinc-600 dark:text-zinc-300">
+          Get started with Go Quality Gate in just a few steps.
+        </p>
+      </div>
+      <div class="mt-8 relative max-w-3xl mx-auto">
+        <ol
+          class="list-decimal list-inside space-y-6 text-zinc-600 dark:text-zinc-300"
+        >
+          <li>
+            <span class="font-semibold">Download the binary for your platform</span>
+            <pre
+              class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
+            ><code># Linux (x64)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-linux-amd64
+chmod +x quality-gate-linux-amd64
+sudo mv quality-gate-linux-amd64 /usr/local/bin/quality-gate
+
+# macOS (Apple Silicon)
+wget https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-darwin-arm64
+chmod +x quality-gate-darwin-arm64
+sudo mv quality-gate-darwin-arm64 /usr/local/bin/quality-gate</code></pre>
+          </li>
+          <li>
+            <span class="font-semibold">Initialize in your project</span>
+            <pre
+              class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
+            ><code>cd your-project
+quality-gate --init</code></pre>
+          </li>
+          <li>
+            <span class="font-semibold">Install Git hooks</span>
+            <pre
+              class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
+            ><code>quality-gate --install</code></pre>
+          </li>
+          <li>
+            <span class="font-semibold">That's it! Now quality checks run automatically on git commit</span>
+            <pre
+              class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
+            ><code>git commit -m "feat: new feature"
+# Quality checks will run automatically</code></pre>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Installation -->
+    <section id="installation" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 bg-zinc-50 dark:bg-zinc-900/50">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h2 class="text-3xl font-extrabold tracking-tight">📥 Installation Options</h2>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Choose the installation method that works best for you.
+        </p>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <span>�</span> Pre-built Binary (Recommended)
+          </h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300 mb-3">
+            Download the latest release for your platform from GitHub.
+          </p>
+          <a
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:opacity-90 text-sm"
+            href="https://github.com/dmux/go-quality-gate/releases/latest"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download Release
+          </a>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <span>�</span> Go Install
+          </h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300 mb-3">
+            Install directly using the Go toolchain.
+          </p>
+          <pre
+            class="rounded-lg bg-zinc-900 text-zinc-100 p-3 overflow-x-auto text-xs"
+          ><code>go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest</code></pre>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <span>🐳</span> Docker
+          </h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300 mb-3">
+            Run with Docker for containerized environments.
+          </p>
+          <pre
+            class="rounded-lg bg-zinc-900 text-zinc-100 p-3 overflow-x-auto text-xs"
+          ><code>docker run --rm ghcr.io/dmux/go-quality-gate:latest --version</code></pre>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <span>🔨</span> Build from Source
+          </h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300 mb-3">
+            Clone and build yourself for development.
+          </p>
+          <pre
+            class="rounded-lg bg-zinc-900 text-zinc-100 p-3 overflow-x-auto text-xs"
+          ><code>git clone https://github.com/dmux/go-quality-gate.git
+cd go-quality-gate
+make build</code></pre>
+        </div>
+      </div>
+    </section>
+    <!-- Usage -->
+    <section id="usage" class="mx-auto max-w-5xl px-4 sm:px-6 py-12">
+      <div class="text-center max-w-2xl mx-auto">
+        <h3 class="text-2xl font-bold">💻 Usage</h3>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Learn how to use Go Quality Gate in your workflow.
+        </p>
+      </div>
+      <div class="mt-6 relative max-w-3xl mx-auto">
+        <pre
+          class="rounded-2xl bg-zinc-900 text-zinc-100 p-6 overflow-x-auto text-sm shadow-xl border border-zinc-800"
+        ><code># Automatic execution via Git hooks
+git commit -m "feat: new feature"
+# Quality checks run automatically
+
+# Manual execution
+quality-gate pre-commit
+
+# With automatic fixes
+quality-gate --fix pre-commit
+
+# JSON output for CI/CD pipelines
+quality-gate --output=json pre-commit
+
+# Check version
+quality-gate --version
+
+# Initialize new project
+quality-gate --init
+</code></pre>
+      </div>
+    </section>
+
+    <!-- Configuration -->
+    <section id="configuration" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 bg-zinc-50 dark:bg-zinc-900/50">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h2 class="text-3xl font-extrabold tracking-tight">⚙️ Configuration</h2>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Configure Go Quality Gate with <code>quality.yml</code>.
+        </p>
+      </div>
+      <div class="max-w-4xl mx-auto">
+        <pre
+          class="rounded-2xl bg-zinc-900 text-zinc-100 p-6 overflow-x-auto text-sm shadow-xl border border-zinc-800"
+        ><code>tools:
+  - name: "Gitleaks"
+    check_command: "gitleaks version"
+    install_command: "go install github.com/zricethezav/gitleaks/v8@latest"
+  - name: "Ruff (Python)"
+    check_command: "ruff --version"
+    install_command: "pip install ruff"
+
+hooks:
+  security:
+    pre-commit:
+      - name: "🔒 Security Check"
+        command: "gitleaks detect --no-git --source . --verbose"
+        output_rules:
+          on_failure_message: "Secret leak detected!"
+
+  python-backend:
+    pre-commit:
+      - name: "🎨 Format Check (Ruff)"
+        command: "ruff format ./backend --check"
+        fix_command: "ruff format ./backend"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Run 'quality-gate --fix' to format."
+
+  typescript-frontend:
+    pre-commit:
+      - name: "🎨 Format Check (Prettier)"
+        command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
+        fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
+</code></pre>
+      </div>
+    </section>
+
+    <!-- Supported Tools -->
+    <section id="supported-tools" class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h2 class="text-3xl font-extrabold tracking-tight">🛠️ Supported Tools</h2>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Automatically detects and configures quality tools based on your project.
+        </p>
+      </div>
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 text-blue-600 dark:text-blue-400">🐹 Go Projects</h3>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-300 space-y-1">
+            <li>• <strong>gofmt</strong> - Code formatting</li>
+            <li>• <strong>goimports</strong> - Import management</li>
+            <li>• <strong>golangci-lint</strong> - Comprehensive linting</li>
+            <li>• <strong>go vet</strong> - Static analysis</li>
+            <li>• <strong>gosec</strong> - Security scanning</li>
+          </ul>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 text-yellow-600 dark:text-yellow-400">🐍 Python Projects</h3>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-300 space-y-1">
+            <li>• <strong>black</strong> - Code formatting</li>
+            <li>• <strong>ruff</strong> - Fast linting & formatting</li>
+            <li>• <strong>isort</strong> - Import sorting</li>
+            <li>• <strong>flake8</strong> - Style checking</li>
+            <li>• <strong>mypy</strong> - Type checking</li>
+            <li>• <strong>bandit</strong> - Security scanning</li>
+          </ul>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 text-green-600 dark:text-green-400">📦 Node.js Projects</h3>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-300 space-y-1">
+            <li>• <strong>prettier</strong> - Code formatting</li>
+            <li>• <strong>eslint</strong> - Linting & analysis</li>
+            <li>• <strong>npm audit</strong> - Security scanning</li>
+            <li>• <strong>tsc</strong> - TypeScript checking</li>
+          </ul>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950"
+        >
+          <h3 class="font-semibold mb-3 text-purple-600 dark:text-purple-400">🌐 Universal Tools</h3>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-300 space-y-1">
+            <li>• <strong>gitleaks</strong> - Secret scanning</li>
+            <li>• <strong>shellcheck</strong> - Shell script analysis</li>
+            <li>• <strong>hadolint</strong> - Dockerfile linting</li>
+            <li>• <strong>yamllint</strong> - YAML validation</li>
+          </ul>
+        </div>
+        <div
+          class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950 md:col-span-2"
+        >
+          <h3 class="font-semibold mb-3 text-red-600 dark:text-red-400">🔧 Custom Tools</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Define your own tools and commands in <code>quality.yml</code>. Go Quality Gate can integrate with any command-line tool that returns proper exit codes.
+          </p>
+        </div>
+      </div>
+    </section>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-zinc-200 dark:border-zinc-800 py-10">
+      <div
+        class="mx-auto max-w-7xl px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4"
+      >
+        <div
+          class="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400"
+        >
+          <img src="./gopher.png" alt="Go Quality Gate logo" class="w-6 h-6" />
+          <span>Go Quality Gate • MIT License</span>
+        </div>
+        <div class="flex items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
+          <a href="https://github.com/dmux/go-quality-gate" class="hover:opacity-80">GitHub</a>
+          <a href="https://github.com/dmux/go-quality-gate/issues" class="hover:opacity-80">Issues</a>
+          <a href="https://github.com/dmux/go-quality-gate/blob/main/docs/contributing.md" class="hover:opacity-80">Contributing</a>
+        </div>
+        <div class="text-xs text-zinc-500 dark:text-zinc-400">
+          &copy; <span id="year"></span> dmux
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Year
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Theme toggle
+      const root = document.documentElement;
+      const themeBtn = document.getElementById("themeToggle");
+      const themeIcon = document.getElementById("themeIcon");
+      const themeStored = localStorage.getItem("go-quality-gate-theme");
+      if (
+        themeStored === "dark" ||
+        (!themeStored &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches)
+      ) {
+        root.classList.add("dark");
+        root.setAttribute("data-theme", "dark");
+        themeIcon.textContent = "☀️";
+      }
+      themeBtn.addEventListener("click", () => {
+        const isDark = root.classList.toggle("dark");
+        root.setAttribute("data-theme", isDark ? "dark" : "light");
+        localStorage.setItem("go-quality-gate-theme", isDark ? "dark" : "light");
+        themeIcon.textContent = isDark ? "☀️" : "🌙";
+      });
+
+      // Typing animation
+      const commandElement = document.getElementById("typed-command");
+      const commands = [
+        "quality-gate --init",
+        "quality-gate --install",
+        "git commit -m 'feat: new feature'",
+        "quality-gate --fix pre-commit",
+        "quality-gate --output=json pre-commit",
+        "quality-gate --version",
+      ];
+      let commandIndex = 0;
+      let charIndex = 0;
+      let isDeleting = false;
+
+      function type() {
+        const currentCommand = commands[commandIndex];
+        if (isDeleting) {
+          commandElement.textContent = currentCommand.substring(
+            0,
+            charIndex - 1
+          );
+          charIndex--;
+          if (charIndex === 0) {
+            isDeleting = false;
+            commandIndex = (commandIndex + 1) % commands.length;
+          }
+        } else {
+          commandElement.textContent = currentCommand.substring(
+            0,
+            charIndex + 1
+          );
+          charIndex++;
+          if (charIndex === currentCommand.length) {
+            isDeleting = true;
+            setTimeout(type, 2000); // Pause at end
+            return;
+          }
+        }
+        setTimeout(type, isDeleting ? 50 : 100);
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (commandElement) {
+          type();
+        }
+      });
+    </script>
+  </body>
+</html>
