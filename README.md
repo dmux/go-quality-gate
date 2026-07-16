@@ -187,6 +187,32 @@ The configuration is divided into two main sections:
 
 - **`hooks`**: Quality check configuration
 
+#### Tool Validation Cache
+
+On the first `pre-commit` or `pre-push` execution, Quality Gate runs each
+configured `check_command` and installs any missing tool with its
+`install_command`. After every tool has been successfully validated, it stores
+a SHA-256 hash of the `tools` configuration in:
+
+```text
+.git/quality-gate/tools.sha256
+```
+
+Subsequent executions skip the installation checks while the configuration is
+unchanged. Changing a tool's `name`, `check_command`, or `install_command`, as
+well as adding, removing, or reordering tools, invalidates the cache and causes
+all tools to be validated again.
+
+The cache is only updated after a successful validation. If it is missing,
+outdated, unreadable, or cannot be written, Quality Gate falls back to checking
+the tools normally without blocking the configured hooks. To force a new
+validation—for example, after manually uninstalling a tool—delete the cache
+file before running a hook:
+
+```bash
+rm .git/quality-gate/tools.sha256
+```
+
 #### Complete Example
 
 ```yaml
