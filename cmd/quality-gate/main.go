@@ -125,7 +125,8 @@ func main() {
 
 	shellRunner := &shell.RealShellRunner{}
 	consoleLogger := logger.NewConsoleLogger(*outputFlag == "json")
-	toolManager := service.NewToolManagerService(shellRunner, consoleLogger)
+	gitRepo := &git.RealGitRepository{}
+	toolManager := service.NewCachingToolManagerService(shellRunner, consoleLogger, gitRepo)
 	hookRunner := service.NewHookRunnerService(shellRunner, consoleLogger)
 	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
 

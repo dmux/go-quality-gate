@@ -139,6 +139,33 @@ A configuração é dividida em duas seções principais:
 
 - **`hooks`**: Configuração das verificações de qualidade
 
+#### Cache de Validação das Ferramentas
+
+Na primeira execução de um `pre-commit` ou `pre-push`, o Quality Gate executa
+o `check_command` de cada ferramenta configurada e instala as ferramentas
+ausentes por meio do respectivo `install_command`. Depois que todas forem
+validadas com sucesso, um hash SHA-256 da configuração `tools` é salvo em:
+
+```text
+.git/quality-gate/tools.sha256
+```
+
+As execuções seguintes pulam as verificações de instalação enquanto a
+configuração permanecer inalterada. Alterar o `name`, `check_command` ou
+`install_command` de uma ferramenta, assim como adicionar, remover ou reordenar
+ferramentas, invalida o cache e faz com que todas sejam validadas novamente.
+
+O cache só é atualizado depois de uma validação bem-sucedida. Se estiver
+ausente, desatualizado, ilegível ou não puder ser gravado, o Quality Gate volta
+a verificar as ferramentas normalmente, sem impedir a execução dos hooks
+configurados. Para forçar uma nova validação — por exemplo, após desinstalar
+manualmente uma ferramenta — remova o arquivo de cache antes de executar um
+hook:
+
+```bash
+rm .git/quality-gate/tools.sha256
+```
+
 #### Exemplo Completo
 
 ```yaml
