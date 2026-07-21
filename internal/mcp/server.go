@@ -61,7 +61,7 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 	}
 
 	results, err := s.qgService.Run(s.cfg, hookType)
-	
+
 	// Create a text result with details of each check
 	var textOutput string
 	overallSuccess := true
@@ -72,7 +72,7 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 			status = "FAILURE"
 			overallSuccess = false
 		}
-		
+
 		textOutput += fmt.Sprintf("Hook: %s\nCommand: %s\nStatus: %s\nDuration: %v\nOutput:\n%s\n\n",
 			result.Hook.Name,
 			result.Hook.Command,
