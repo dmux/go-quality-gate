@@ -12,6 +12,7 @@ import (
 	"github.com/dmux/go-quality-gate/internal/infra/git"
 	"github.com/dmux/go-quality-gate/internal/infra/logger"
 	"github.com/dmux/go-quality-gate/internal/infra/shell"
+	"github.com/dmux/go-quality-gate/internal/mcp"
 	"github.com/dmux/go-quality-gate/internal/service"
 )
 
@@ -51,10 +52,12 @@ func main() {
 	}
 
 	args := flag.Args()
+	isMCP := len(args) > 0 && args[0] == "mcp"
+	isJsonOutput := *outputFlag == "json" || isMCP
 
 	// Helper function to print to the correct output stream
 	logPrint := func(format string, args ...interface{}) {
-		if *outputFlag == "json" {
+		if isJsonOutput {
 			fmt.Fprintf(os.Stderr, format, args...)
 		} else {
 			fmt.Printf(format, args...)
@@ -62,7 +65,7 @@ func main() {
 	}
 
 	logPrintln := func(msg string) {
-		if *outputFlag == "json" {
+		if isJsonOutput {
 			fmt.Fprintln(os.Stderr, msg)
 		} else {
 			fmt.Println(msg)
@@ -98,6 +101,7 @@ func main() {
 		logPrintln("Hook Types:")
 		logPrintln("  pre-commit    Run pre-commit quality checks")
 		logPrintln("  pre-push      Run pre-push quality checks")
+		logPrintln("  mcp           Start Model Context Protocol (MCP) server")
 		logPrintln("")
 		logPrintln("Options:")
 		logPrintln("  --install     Install git hooks in the current repository")
@@ -124,11 +128,20 @@ func main() {
 	}
 
 	shellRunner := &shell.RealShellRunner{}
-	consoleLogger := logger.NewConsoleLogger(*outputFlag == "json")
+	consoleLogger := logger.NewConsoleLogger(isJsonOutput)
 	gitRepo := &git.RealGitRepository{}
 	toolManager := service.NewCachingToolManagerService(shellRunner, consoleLogger, gitRepo)
 	hookRunner := service.NewHookRunnerService(shellRunner, consoleLogger)
 	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
+
+	if hookType == "mcp" {
+		mcpServer := mcp.NewMCPServer(qualityGate, cfg)
+		if err := mcpServer.Start(); err != nil {
+			logPrint("Error starting MCP server: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if *fixFlag {
 		logPrintln("Fixing fixable issues...")
@@ -152,7 +165,7 @@ func main() {
 		}
 	}
 
-	if *outputFlag == "json" {
+	if isJsonOutput && !isMCP {
 		// Convert results to include duration in a more readable format
 		type JSONResult struct {
 			Hook         domain.Hook `json:"hook"`
@@ -189,7 +202,7 @@ func main() {
 		if overallStatus == "failure" {
 			os.Exit(1)
 		}
-	} else {
+	} else if !isMCP {
 		if overallStatus == "success" {
 			logPrintln("Quality gate passed successfully.")
 		} else {
