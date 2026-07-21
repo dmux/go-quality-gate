@@ -28,6 +28,7 @@ Uma ferramenta de controle de qualidade de código construída em Go, distribuí
 - **🔒 Segurança Integrada**: Verificação de segredos no fluxo de commit
 - **⚡ Performance Nativa**: Execução instantânea sem interpretadores
 - **🚀 CI/CD Ready**: Output JSON limpo para pipelines de automação
+- **🤖 Servidor MCP**: Suporte ao Model Context Protocol para Agentes de IA (Cursor, Claude, etc.)
 
 ## 🚀 Quick Start
 
@@ -66,6 +67,9 @@ git commit -m "feat: nova funcionalidade"
 
 # Correção automática
 ./quality-gate --fix pre-commit
+
+# Rodar como Servidor Model Context Protocol (MCP) para IAs
+./quality-gate mcp
 ```
 
 ## ⚙️ Configuração (quality.yml)
@@ -215,6 +219,7 @@ hooks:
 | `--install`     | Instala Git hooks no repositório                 | `./quality-gate --install`                |
 | `--init`        | Gera quality.yml inicial com análise inteligente | `./quality-gate --init`                   |
 | `--fix`         | Executa correções automáticas                    | `./quality-gate --fix pre-commit`         |
+| `mcp`           | Roda como um servidor MCP para integração com IA | `./quality-gate mcp`                      |
 | `--version, -v` | Mostra informações de versão                     | `./quality-gate --version`                |
 | `--output=json` | Output estruturado para CI/CD                    | `./quality-gate --output=json pre-commit` |
 
@@ -254,6 +259,28 @@ hooks:
   ]
 }
 ```
+
+## 🤖 Integração com Model Context Protocol (MCP)
+
+O Go Quality Gate pode atuar como um servidor MCP, fornecendo aos assistentes de IA (como Cursor, Claude Desktop ou Cline) a capacidade nativa de interagir com as ferramentas de qualidade do seu repositório.
+
+### Conectando a um Agente
+Para usar o `go-quality-gate` com ferramentas como o Cursor, basta configurar o servidor MCP via standard I/O (stdio). No seu projeto (ou na interface do Cursor), adicione ou crie um `.mcp.json` na raiz:
+
+```json
+{
+  "mcpServers": {
+    "go-quality-gate": {
+      "command": "./quality-gate",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+O servidor expõe as seguintes "Tools" (ferramentas) para a sua IA:
+1. `run_quality_checks`: Executa linters e formatações, retornando diagnósticos parseados para a IA corrigir.
+2. `run_auto_fix`: Permite que a IA acione os comandos de formatação automáticos configurados no `quality.yml`.
 
 ## 🛠️ Desenvolvimento
 
