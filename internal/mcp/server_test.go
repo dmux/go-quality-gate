@@ -61,7 +61,7 @@ func TestMCPServer_RunQualityChecks(t *testing.T) {
 	if len(content) == 0 {
 		t.Fatalf("expected text output, got empty")
 	}
-	
+
 	if !strings.Contains(content, "Test Hook") {
 		t.Fatalf("expected output to contain 'Test Hook', got %s", content)
 	}
