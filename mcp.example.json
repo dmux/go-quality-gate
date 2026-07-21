@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "go-quality-gate": {
+      "command": "./quality-gate",
+      "args": ["mcp"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    }
+  }
+}

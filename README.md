@@ -29,6 +29,7 @@ A code quality control tool built in Go, distributed as a single binary with no 
 - **🔒 Built-in Security**: Secret scanning in commit workflow
 - **⚡ Native Performance**: Instant execution without interpreters
 - **🚀 CI/CD Ready**: Clean JSON output for automation pipelines
+- **🤖 MCP Server**: Model Context Protocol support for AI coding agents (Claude, Cursor, etc.)
 
 ## 🚀 Quick Start
 
@@ -114,6 +115,9 @@ git commit -m "feat: new feature"
 
 # Auto-fix
 ./quality-gate --fix pre-commit
+
+# Run as Model Context Protocol (MCP) Server for AI Agents
+./quality-gate mcp
 ```
 
 ## ⚙️ Configuration (quality.yml)
@@ -262,6 +266,7 @@ hooks:
 | `--install`     | Installs Git hooks in repository                        | `./quality-gate --install`                |
 | `--init`        | Generates initial quality.yml with intelligent analysis | `./quality-gate --init`                   |
 | `--fix`         | Executes automatic fixes                                | `./quality-gate --fix pre-commit`         |
+| `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
 
@@ -301,6 +306,28 @@ hooks:
   ]
 }
 ```
+
+## 🤖 Model Context Protocol (MCP) Integration
+
+Go Quality Gate can act as an MCP server, providing standard AI coding agents (like Claude Desktop, Cursor, or Cline) with the ability to interact with your codebase's quality tools natively.
+
+### Connecting to an Agent
+To use `go-quality-gate` with Cursor or Claude, simply configure the MCP server to run via standard I/O (stdio). For Cursor, create or update `.mcp.json` in your workspace:
+
+```json
+{
+  "mcpServers": {
+    "go-quality-gate": {
+      "command": "./quality-gate",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The server exposes the following MCP Tools to your AI:
+1. `run_quality_checks`: Executes linters and formatting checks, returning a parsed diagnostic for the AI.
+2. `run_auto_fix`: Allows the AI to automatically trigger the formatting fixes configured in `quality.yml`.
 
 ## 🛠️ Development
 
