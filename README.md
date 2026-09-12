@@ -259,6 +259,11 @@ hooks:
         fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
 ```
 
+> With `--parallel`, the three `pre-commit` hooks above (Gitleaks, Ruff format
+> check, Pytest) run concurrently instead of one after another — useful here
+> since Pytest can be the slow one. Run with:
+> `./quality-gate --parallel pre-commit`
+
 ## 📋 Available Commands
 
 | Command         | Description                                             | Example                                   |
@@ -269,6 +274,7 @@ hooks:
 | `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
+| `--parallel`    | Runs independent hooks concurrently (opt-in)            | `./quality-gate --parallel pre-commit`    |
 
 ### 📊 Version Information
 
