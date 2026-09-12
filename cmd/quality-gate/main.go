@@ -23,6 +23,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Show version information")
 	versionFlagShort := flag.Bool("v", false, "Show version information (shorthand)")
 	outputFlag := flag.String("output", "", "Output format (e.g., json)")
+	parallelFlag := flag.Bool("parallel", false, "Run independent hooks concurrently")
 
 	flag.Parse()
 
@@ -109,6 +110,7 @@ func main() {
 		logPrintln("  --fix         Automatically fix detected issues")
 		logPrintln("  --version, -v Show version information")
 		logPrintln("  --output json Output results in JSON format")
+		logPrintln("  --parallel    Run independent hooks concurrently")
 		logPrintln("")
 		logPrintln("Examples:")
 		logPrintln("  quality-gate --init              # Create quality.yml for your project")
@@ -154,7 +156,7 @@ func main() {
 		return
 	}
 
-	results, err := qualityGate.Run(cfg, hookType)
+	results, err := qualityGate.Run(cfg, hookType, *parallelFlag)
 
 	overallStatus := "success"
 	if err != nil {

@@ -60,7 +60,7 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultError("hookType must be a string"), nil
 	}
 
-	results, err := s.qgService.Run(s.cfg, hookType)
+	results, err := s.qgService.Run(s.cfg, hookType, false)
 
 	// Create a text result with details of each check
 	var textOutput string
