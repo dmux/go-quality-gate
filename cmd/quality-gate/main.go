@@ -129,6 +129,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	validationResult := config.NewConfigValidator(cfg).Validate()
+	if len(validationResult.Errors) > 0 {
+		if !validationResult.Valid {
+			// Critical/Error severity: block execution before any hook can run.
+			// stdout is the MCP stdio transport, so never write there for the
+			// mcp subcommand — only stderr, regardless of JSON mode.
+			if isJsonOutput && !isMCP {
+				jsonBytes, marshalErr := json.MarshalIndent(validationResult, "", "  ")
+				if marshalErr != nil {
+					logPrint("Error marshaling validation JSON: %v\n", marshalErr)
+					os.Exit(1)
+				}
+				fmt.Println(string(jsonBytes))
+			} else {
+				logPrint("%s\n", validationResult.GetFormattedErrors())
+			}
+			os.Exit(1)
+		}
+		// Warning-only: display but continue. logPrintln already routes to
+		// stderr in JSON/MCP mode, so this never corrupts a JSON stdout
+		// payload or the MCP stdio transport.
+		logPrintln(validationResult.GetFormattedErrors())
+	}
+
 	shellRunner := &shell.RealShellRunner{}
 	consoleLogger := logger.NewConsoleLogger(isJsonOutput)
 	gitRepo := &git.RealGitRepository{}
