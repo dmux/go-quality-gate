@@ -5,18 +5,19 @@ import (
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
+	"github.com/dmux/go-quality-gate/internal/repository"
 )
 
 // QualityGateService is the main service that orchestrates the quality gate process.
 
 type QualityGateService struct {
-	toolManager *ToolManagerService
-	hookRunner  *HookRunnerService
+	toolManager repository.ToolManager
+	hookRunner  repository.HookRunner
 }
 
 // NewQualityGateService creates a new QualityGateService.
 
-func NewQualityGateService(toolManager *ToolManagerService, hookRunner *HookRunnerService) *QualityGateService {
+func NewQualityGateService(toolManager repository.ToolManager, hookRunner repository.HookRunner) *QualityGateService {
 	return &QualityGateService{toolManager: toolManager, hookRunner: hookRunner}
 }
 
