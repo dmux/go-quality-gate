@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,11 +11,11 @@ import (
 
 // ValidationError represents a configuration validation error
 type ValidationError struct {
-	Field      string
-	Value      string
-	Issue      string
-	Suggestion string
-	Severity   ValidationSeverity
+	Field      string             `json:"field"`
+	Value      string             `json:"value"`
+	Issue      string             `json:"issue"`
+	Suggestion string             `json:"suggestion"`
+	Severity   ValidationSeverity `json:"severity"`
 }
 
 // ValidationSeverity indicates the severity of a validation issue
@@ -39,10 +40,17 @@ func (s ValidationSeverity) String() string {
 	}
 }
 
+// MarshalJSON serializes the severity as its string name (e.g. "CRITICAL")
+// rather than its underlying int value, so JSON consumers don't need to know
+// the enum ordering.
+func (s ValidationSeverity) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
 // ValidationResult holds the result of configuration validation
 type ValidationResult struct {
-	Valid  bool
-	Errors []ValidationError
+	Valid  bool              `json:"valid"`
+	Errors []ValidationError `json:"errors"`
 }
 
 // ConfigValidator validates quality.yml configurations
@@ -303,21 +311,17 @@ func (v *ConfigValidator) validateCommandSyntax(command, fieldPath string, resul
 
 // validateToolNames checks for common typos in tool names
 func (v *ConfigValidator) validateToolNames(command, fieldPath string, result *ValidationResult) {
+	// Entries whose "typo" is a substring of its own "correct" value (or vice
+	// versa) are deliberately omitted: strings.Contains would flag every
+	// correct usage as a typo of itself (e.g. "ruf" inside "ruff", "gofmt "
+	// inside "gofmt -l .", "golangci" inside "golangci-lint").
 	commonTypos := map[string]string{
-		"prettier":      "prettier",
-		"pretier":       "prettier",
-		"pretter":       "prettier",
-		"eslint":        "eslint",
-		"esslint":       "eslint",
-		"eslinter":      "eslint",
-		"pytest":        "pytest",
-		"py.test":       "pytest",
-		"ruf":           "ruff",
-		"ruff ":         "ruff",
-		"gofmt ":        "gofmt",
-		"go fmt":        "gofmt",
-		"golangci":      "golangci-lint",
-		"golangci-lint": "golangci-lint",
+		"pretier":  "prettier",
+		"pretter":  "prettier",
+		"esslint":  "eslint",
+		"eslinter": "eslint",
+		"py.test":  "pytest",
+		"go fmt":   "gofmt",
 	}
 
 	cmdLower := strings.ToLower(command)

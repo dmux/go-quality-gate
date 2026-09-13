@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -327,6 +328,26 @@ func TestConfigValidator_ValidateCommand(t *testing.T) {
 			command:     `echo "hello world"`,
 			expectError: false,
 		},
+		{
+			name:        "RuffFormatCommandIsNotAFalsePositiveTypo",
+			command:     "ruff format ./backend --check",
+			expectError: false,
+		},
+		{
+			name:        "RuffVersionCommandIsNotAFalsePositiveTypo",
+			command:     "ruff --version",
+			expectError: false,
+		},
+		{
+			name:        "GofmtWithArgsIsNotAFalsePositiveTypo",
+			command:     "gofmt -l .",
+			expectError: false,
+		},
+		{
+			name:        "GolangciLintRunIsNotAFalsePositiveTypo",
+			command:     "golangci-lint run",
+			expectError: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -498,6 +519,54 @@ func TestValidationResult_GetErrorsBySeverity(t *testing.T) {
 	}
 	if len(errorsBySeverity[SeverityCritical]) != 1 {
 		t.Errorf("Expected 1 critical error, got %d", len(errorsBySeverity[SeverityCritical]))
+	}
+}
+
+func TestValidationResult_JSONSerialization(t *testing.T) {
+	result := &ValidationResult{
+		Valid: false,
+		Errors: []ValidationError{
+			{
+				Field:      "hooks.security.pre-commit[0].command",
+				Value:      "rm -rf /",
+				Issue:      "Potentially dangerous command detected",
+				Suggestion: "Review the command for security implications",
+				Severity:   SeverityCritical,
+			},
+		},
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("failed to marshal ValidationResult: %v", err)
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal into a generic map: %v", err)
+	}
+
+	if valid, ok := decoded["valid"].(bool); !ok || valid {
+		t.Errorf("expected top-level \"valid\": false, got %v", decoded["valid"])
+	}
+
+	errs, ok := decoded["errors"].([]interface{})
+	if !ok || len(errs) != 1 {
+		t.Fatalf("expected a single-element \"errors\" array, got %v", decoded["errors"])
+	}
+
+	errMap, ok := errs[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected error entry to be an object, got %T", errs[0])
+	}
+
+	// Severity must serialize as its string name, not the underlying int,
+	// so JSON consumers don't need to know the enum ordering.
+	if severity, ok := errMap["severity"].(string); !ok || severity != "CRITICAL" {
+		t.Errorf("expected \"severity\": \"CRITICAL\", got %v", errMap["severity"])
+	}
+	if field, ok := errMap["field"].(string); !ok || field != "hooks.security.pre-commit[0].command" {
+		t.Errorf("expected \"field\" to round-trip, got %v", errMap["field"])
 	}
 }
 
