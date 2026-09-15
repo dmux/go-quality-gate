@@ -20,16 +20,24 @@ func NewInstallationService(gitRepo repository.GitRepository) *InstallationServi
 	return &InstallationService{gitRepo: gitRepo}
 }
 
+// osExecutable and evalSymlinks are os.Executable/filepath.EvalSymlinks,
+// swappable in tests to exercise InstallHooks' error paths — neither
+// realistically fails for the running test binary itself.
+var (
+	osExecutable = os.Executable
+	evalSymlinks = filepath.EvalSymlinks
+)
+
 // InstallHooks installs the pre-commit and pre-push git hooks. The hooks
 // invoke the quality-gate binary by its resolved absolute path rather than
 // by name, so they aren't subject to PATH lookup at commit/push time.
 func (s *InstallationService) InstallHooks() error {
-	execPath, err := os.Executable()
+	execPath, err := osExecutable()
 	if err != nil {
 		return fmt.Errorf("failed to resolve executable path: %w", err)
 	}
 
-	realPath, err := filepath.EvalSymlinks(execPath)
+	realPath, err := evalSymlinks(execPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve symlink: %w", err)
 	}

@@ -4,33 +4,54 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
 	"github.com/dmux/go-quality-gate/internal/infra/git"
+	"github.com/dmux/go-quality-gate/internal/infra/history"
 	"github.com/dmux/go-quality-gate/internal/infra/logger"
 	"github.com/dmux/go-quality-gate/internal/infra/shell"
+	"github.com/dmux/go-quality-gate/internal/infra/webui"
 	"github.com/dmux/go-quality-gate/internal/mcp"
 	"github.com/dmux/go-quality-gate/internal/service"
 )
 
 func main() {
-	installFlag := flag.Bool("install", false, "Install git hooks")
-	initFlag := flag.Bool("init", false, "Initialize quality.yml")
-	fixFlag := flag.Bool("fix", false, "Fix fixable issues")
-	versionFlag := flag.Bool("version", false, "Show version information")
-	versionFlagShort := flag.Bool("v", false, "Show version information (shorthand)")
-	outputFlag := flag.String("output", "", "Output format (e.g., json)")
-	parallelFlag := flag.Bool("parallel", false, "Run independent hooks concurrently")
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
 
-	flag.Parse()
+// marshalJSONIndent is json.MarshalIndent, swappable in tests to exercise
+// this file's marshal-error branches — the values passed to it (version
+// info, validation results, hook results) are all plain-typed and can't
+// realistically fail to marshal, so a real failure isn't reproducible.
+var marshalJSONIndent = json.MarshalIndent
+
+// run implements the CLI end to end, returning a process exit code instead
+// of calling os.Exit directly, and writing to the given streams instead of
+// hardcoding os.Stdout/os.Stderr, so it's fully exercisable from tests.
+func run(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("quality-gate", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	installFlag := fs.Bool("install", false, "Install git hooks")
+	initFlag := fs.Bool("init", false, "Initialize quality.yml")
+	fixFlag := fs.Bool("fix", false, "Fix fixable issues")
+	versionFlag := fs.Bool("version", false, "Show version information")
+	versionFlagShort := fs.Bool("v", false, "Show version information (shorthand)")
+	outputFlag := fs.String("output", "", "Output format (e.g., json)")
+	parallelFlag := fs.Bool("parallel", false, "Run independent hooks concurrently")
+	portFlag := fs.Int("port", 4173, "Port for the 'ui' web dashboard")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
 
 	// Handle version flag first, before any other operations
 	if *versionFlag || *versionFlagShort {
 		if *outputFlag == "json" {
-			// Output version information as JSON
 			versionJSON := struct {
 				Version   string `json:"version"`
 				BuildDate string `json:"build_date"`
@@ -40,36 +61,35 @@ func main() {
 				BuildDate: BuildDate,
 				GitCommit: GitCommit,
 			}
-			jsonBytes, err := json.MarshalIndent(versionJSON, "", "  ")
+			jsonBytes, err := marshalJSONIndent(versionJSON, "", "  ")
 			if err != nil {
-				fmt.Printf("Error marshaling version JSON: %v\n", err)
-				os.Exit(1)
+				fmt.Fprintf(stdout, "Error marshaling version JSON: %v\n", err)
+				return 1
 			}
-			fmt.Println(string(jsonBytes))
+			fmt.Fprintln(stdout, string(jsonBytes))
 		} else {
-			fmt.Println(VersionInfo())
+			fmt.Fprintln(stdout, VersionInfo())
 		}
-		return
+		return 0
 	}
 
-	args := flag.Args()
-	isMCP := len(args) > 0 && args[0] == "mcp"
+	cmdArgs := fs.Args()
+	isMCP := len(cmdArgs) > 0 && cmdArgs[0] == "mcp"
 	isJsonOutput := *outputFlag == "json" || isMCP
 
-	// Helper function to print to the correct output stream
 	logPrint := func(format string, args ...interface{}) {
 		if isJsonOutput {
-			fmt.Fprintf(os.Stderr, format, args...)
+			fmt.Fprintf(stderr, format, args...)
 		} else {
-			fmt.Printf(format, args...)
+			fmt.Fprintf(stdout, format, args...)
 		}
 	}
 
 	logPrintln := func(msg string) {
 		if isJsonOutput {
-			fmt.Fprintln(os.Stderr, msg)
+			fmt.Fprintln(stderr, msg)
 		} else {
-			fmt.Println(msg)
+			fmt.Fprintln(stdout, msg)
 		}
 	}
 
@@ -79,10 +99,10 @@ func main() {
 		installationService := service.NewInstallationService(gitRepo)
 		if err := installationService.InstallHooks(); err != nil {
 			logPrint("Error installing git hooks: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		logPrintln("Git hooks installed successfully.")
-		return
+		return 0
 	}
 
 	if *initFlag {
@@ -90,19 +110,21 @@ func main() {
 		initService := service.NewInitService()
 		if err := initService.Init(); err != nil {
 			logPrint("Error initializing quality.yml: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		logPrintln("quality.yml initialized successfully.")
-		return
+		return 0
 	}
 
-	if len(args) == 0 {
+	if len(cmdArgs) == 0 {
 		logPrintln("Usage: quality-gate [OPTIONS] [HOOK_TYPE]")
 		logPrintln("")
 		logPrintln("Hook Types:")
 		logPrintln("  pre-commit    Run pre-commit quality checks")
 		logPrintln("  pre-push      Run pre-push quality checks")
 		logPrintln("  mcp           Start Model Context Protocol (MCP) server")
+		logPrintln("  stats         Show streaks, achievements, and time saved")
+		logPrintln("  ui            Open the local web dashboard")
 		logPrintln("")
 		logPrintln("Options:")
 		logPrintln("  --install     Install git hooks in the current repository")
@@ -111,6 +133,7 @@ func main() {
 		logPrintln("  --version, -v Show version information")
 		logPrintln("  --output json Output results in JSON format")
 		logPrintln("  --parallel    Run independent hooks concurrently")
+		logPrintln("  --port N      Port for 'ui' web dashboard (default 4173)")
 		logPrintln("")
 		logPrintln("Examples:")
 		logPrintln("  quality-gate --init              # Create quality.yml for your project")
@@ -118,15 +141,33 @@ func main() {
 		logPrintln("  quality-gate pre-commit          # Run pre-commit checks")
 		logPrintln("  quality-gate --fix pre-commit    # Fix issues and run checks")
 		logPrintln("  quality-gate --version           # Show version")
-		os.Exit(1)
+		return 1
 	}
 
-	hookType := args[0]
+	hookType := cmdArgs[0]
+
+	if hookType == "stats" {
+		runStatsCommand(logPrintln)
+		return 0
+	}
+
+	if hookType == "ui" {
+		gitDir, err := history.FindGitDir()
+		if err != nil {
+			logPrint("Not inside a git repository: %v\n", err)
+			return 1
+		}
+		if err := webui.Serve(gitDir, *portFlag); err != nil {
+			logPrint("Error running dashboard server: %v\n", err)
+			return 1
+		}
+		return 0
+	}
 
 	cfg, err := config.LoadConfig("quality.yml")
 	if err != nil {
 		logPrint("Error loading quality.yml: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	validationResult := config.NewConfigValidator(cfg).Validate()
@@ -136,16 +177,16 @@ func main() {
 			// stdout is the MCP stdio transport, so never write there for the
 			// mcp subcommand — only stderr, regardless of JSON mode.
 			if isJsonOutput && !isMCP {
-				jsonBytes, marshalErr := json.MarshalIndent(validationResult, "", "  ")
+				jsonBytes, marshalErr := marshalJSONIndent(validationResult, "", "  ")
 				if marshalErr != nil {
 					logPrint("Error marshaling validation JSON: %v\n", marshalErr)
-					os.Exit(1)
+					return 1
 				}
-				fmt.Println(string(jsonBytes))
+				fmt.Fprintln(stdout, string(jsonBytes))
 			} else {
 				logPrint("%s\n", validationResult.GetFormattedErrors())
 			}
-			os.Exit(1)
+			return 1
 		}
 		// Warning-only: display but continue. logPrintln already routes to
 		// stderr in JSON/MCP mode, so this never corrupts a JSON stdout
@@ -164,9 +205,9 @@ func main() {
 		mcpServer := mcp.NewMCPServer(qualityGate, cfg)
 		if err := mcpServer.Start(); err != nil {
 			logPrint("Error starting MCP server: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
-		return
+		return 0
 	}
 
 	if *fixFlag {
@@ -174,24 +215,31 @@ func main() {
 		err = qualityGate.Fix(cfg, hookType)
 		if err != nil {
 			logPrint("Error fixing issues: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		logPrintln("Fixable issues fixed successfully.")
-		return
+		recordFixHistory(cfg, hookType)
+		return 0
 	}
 
+	runStart := time.Now()
 	results, err := qualityGate.Run(cfg, hookType, *parallelFlag)
+	recordRunHistory(hookType, results, err == nil, time.Since(runStart))
 
 	overallStatus := "success"
 	if err != nil {
 		overallStatus = "failure"
 		logPrint("Quality gate failed: %v\n", err)
 		if *outputFlag != "json" {
-			os.Exit(1)
+			return 1
 		}
+		// outputFlag == "json": fall through to report the failure as JSON
+		// below instead of exiting immediately.
 	}
 
-	if isJsonOutput && !isMCP {
+	// isMCP is always false below this point: the hookType == "mcp" branch
+	// above already returned whenever it was true.
+	if isJsonOutput {
 		// Convert results to include duration in a more readable format
 		type JSONResult struct {
 			Hook         domain.Hook `json:"hook"`
@@ -219,21 +267,20 @@ func main() {
 			Status:  overallStatus,
 			Results: jsonResults,
 		}
-		jsonBytes, marshalErr := json.MarshalIndent(jsonOutput, "", "  ")
+		jsonBytes, marshalErr := marshalJSONIndent(jsonOutput, "", "  ")
 		if marshalErr != nil {
 			logPrint("Error marshaling JSON: %v\n", marshalErr)
-			os.Exit(1)
+			return 1
 		}
-		fmt.Println(string(jsonBytes)) // JSON output always goes to stdout
+		fmt.Fprintln(stdout, string(jsonBytes)) // JSON output always goes to stdout
 		if overallStatus == "failure" {
-			os.Exit(1)
+			return 1
 		}
-	} else if !isMCP {
-		if overallStatus == "success" {
-			logPrintln("Quality gate passed successfully.")
-		} else {
-			// Error already logged above, just exit
-			os.Exit(1)
-		}
+		return 0
 	}
+
+	// Reaching here in text mode guarantees overallStatus == "success": a
+	// text-mode failure already returned above.
+	logPrintln("Quality gate passed successfully.")
+	return 0
 }

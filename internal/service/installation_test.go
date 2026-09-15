@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,10 @@ import (
 type MockGitRepository struct {
 	InstalledHooks map[string]string
 	Err            error
+	// FailOnHookType, if set, makes InstallHook fail only for that specific
+	// hookType, succeeding for any other — used to test that a later call
+	// (e.g. pre-push) still propagates its own error.
+	FailOnHookType string
 }
 
 // InstallHook implements the GitRepository interface.
@@ -19,6 +24,9 @@ type MockGitRepository struct {
 func (r *MockGitRepository) InstallHook(hookType string, content string) error {
 	if r.Err != nil {
 		return r.Err
+	}
+	if r.FailOnHookType != "" && hookType == r.FailOnHookType {
+		return errors.New("simulated failure for " + hookType)
 	}
 	if r.InstalledHooks == nil {
 		r.InstalledHooks = make(map[string]string)
@@ -78,5 +86,43 @@ func TestInstallationService_InstallHooks_PropagatesGitRepoError(t *testing.T) {
 
 	if err := service.InstallHooks(); err == nil {
 		t.Fatal("expected InstallHooks to return an error when the git repository fails")
+	}
+}
+
+func TestInstallationService_InstallHooks_PropagatesPrePushError(t *testing.T) {
+	mockRepo := &MockGitRepository{FailOnHookType: "pre-push"}
+	service := NewInstallationService(mockRepo)
+
+	err := service.InstallHooks()
+
+	if err == nil {
+		t.Fatal("expected InstallHooks to return an error when installing pre-push fails")
+	}
+	if _, ok := mockRepo.InstalledHooks["pre-commit"]; !ok {
+		t.Error("expected pre-commit to have been installed before pre-push failed")
+	}
+}
+
+func TestInstallationService_InstallHooks_ExecutablePathError(t *testing.T) {
+	origExecutable := osExecutable
+	osExecutable = func() (string, error) { return "", errors.New("cannot resolve executable") }
+	t.Cleanup(func() { osExecutable = origExecutable })
+
+	service := NewInstallationService(&MockGitRepository{})
+
+	if err := service.InstallHooks(); err == nil {
+		t.Fatal("expected an error when os.Executable fails")
+	}
+}
+
+func TestInstallationService_InstallHooks_SymlinkResolutionError(t *testing.T) {
+	origEvalSymlinks := evalSymlinks
+	evalSymlinks = func(path string) (string, error) { return "", errors.New("cannot resolve symlink") }
+	t.Cleanup(func() { evalSymlinks = origEvalSymlinks })
+
+	service := NewInstallationService(&MockGitRepository{})
+
+	if err := service.InstallHooks(); err == nil {
+		t.Fatal("expected an error when symlink resolution fails")
 	}
 }

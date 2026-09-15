@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -38,5 +40,26 @@ func TestLoadConfig(t *testing.T) {
 
 	if preCommitHooks[0].Name != "🔒 Verificação de Segredos (Gitleaks)" {
 		t.Errorf("Expected hook name '🔒 Verificação de Segredos (Gitleaks)', got '%s'", preCommitHooks[0].Name)
+	}
+}
+
+func TestLoadConfig_FileNotFound(t *testing.T) {
+	_, err := LoadConfig(filepath.Join(t.TempDir(), "does-not-exist.yml"))
+
+	if err == nil {
+		t.Fatal("expected an error for a missing config file")
+	}
+}
+
+func TestLoadConfig_InvalidYAML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "quality.yml")
+	if err := os.WriteFile(path, []byte("tools: [this is not: valid: yaml"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(path)
+
+	if err == nil {
+		t.Fatal("expected an error for malformed YAML")
 	}
 }
