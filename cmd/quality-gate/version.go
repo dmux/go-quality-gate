@@ -6,7 +6,7 @@ import "fmt"
 // These variables are set during build time via -ldflags
 var (
 	// Version is the current version of the quality-gate tool
-	Version = "1.2.0-dev"
+	Version = "1.2.3-dev"
 
 	// BuildDate is set during build time
 	BuildDate = "development"

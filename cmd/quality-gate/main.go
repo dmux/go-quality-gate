@@ -202,7 +202,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
 
 	if hookType == "mcp" {
-		mcpServer := mcp.NewMCPServer(qualityGate, cfg)
+		mcpServer := mcp.NewMCPServer(qualityGate, cfg, Version)
 		if err := mcpServer.Start(); err != nil {
 			logPrint("Error starting MCP server: %v\n", err)
 			return 1
