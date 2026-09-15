@@ -33,7 +33,7 @@ func newTestServer(hooks []config.Hook) *MCPServer {
 		},
 	}
 
-	return NewMCPServer(qualityGate, cfg)
+	return NewMCPServer(qualityGate, cfg, "test")
 }
 
 func TestMCPServer_RunQualityChecks(t *testing.T) {
@@ -60,7 +60,7 @@ func TestMCPServer_RunQualityChecks(t *testing.T) {
 		},
 	}
 
-	server := NewMCPServer(qualityGate, cfg)
+	server := NewMCPServer(qualityGate, cfg, "test")
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -114,7 +114,7 @@ func TestMCPServer_RunAutoFix(t *testing.T) {
 		},
 	}
 
-	server := NewMCPServer(qualityGate, cfg)
+	server := NewMCPServer(qualityGate, cfg, "test")
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{

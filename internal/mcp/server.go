@@ -13,19 +13,23 @@ import (
 type MCPServer struct {
 	qgService *service.QualityGateService
 	cfg       *config.Config
+	version   string
 }
 
-func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config) *MCPServer {
+// NewMCPServer creates an MCPServer that reports version as its protocol
+// version to MCP clients (e.g. the running binary's main.Version).
+func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config, version string) *MCPServer {
 	return &MCPServer{
 		qgService: qgService,
 		cfg:       cfg,
+		version:   version,
 	}
 }
 
 func (s *MCPServer) Start() error {
 	mcpServer := server.NewMCPServer(
 		"go-quality-gate",
-		"1.2.0", // TODO: inject version
+		s.version,
 	)
 
 	runQualityChecksTool := mcp.NewTool("run_quality_checks",

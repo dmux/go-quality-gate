@@ -3,7 +3,7 @@
 # Variables
 BINARY_NAME=quality-gate
 MAIN_PACKAGE=./cmd/quality-gate
-VERSION?=1.2.0
+VERSION?=1.2.3
 BUILD_DATE?=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
