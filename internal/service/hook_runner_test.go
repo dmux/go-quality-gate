@@ -9,6 +9,55 @@ import (
 	"github.com/dmux/go-quality-gate/internal/domain"
 )
 
+func TestHookRunnerService_RunFixCommand_NoFixCommandDefined(t *testing.T) {
+	service := NewHookRunnerService(&MockShellRunner{}, &MockLogger{})
+
+	_, err := service.RunFixCommand(domain.Hook{Name: "Format"})
+
+	if err == nil {
+		t.Fatal("expected an error when no fix command is defined")
+	}
+}
+
+func TestHookRunnerService_RunFixCommand_Success(t *testing.T) {
+	mockRunner := &MockShellRunner{Commands: map[string]struct {
+		Output string
+		Err    error
+	}{
+		"ruff format": {"formatted 3 files", nil},
+	}}
+	mockLogger := &MockLogger{}
+	service := NewHookRunnerService(mockRunner, mockLogger)
+
+	output, err := service.RunFixCommand(domain.Hook{Name: "Format", FixCommand: "ruff format"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if output != "formatted 3 files" {
+		t.Errorf("expected the command output to be returned, got %q", output)
+	}
+}
+
+func TestHookRunnerService_RunFixCommand_Failure(t *testing.T) {
+	mockRunner := &MockShellRunner{Commands: map[string]struct {
+		Output string
+		Err    error
+	}{
+		"ruff format": {"syntax error", errors.New("exit status 1")},
+	}}
+	service := NewHookRunnerService(mockRunner, &MockLogger{})
+
+	output, err := service.RunFixCommand(domain.Hook{Name: "Format", FixCommand: "ruff format"})
+
+	if err == nil {
+		t.Fatal("expected an error when the fix command fails")
+	}
+	if output != "syntax error" {
+		t.Errorf("expected the command output to still be returned alongside the error, got %q", output)
+	}
+}
+
 func TestHookRunnerService_RunHooks(t *testing.T) {
 	mockRunner := &MockShellRunner{
 		Commands: make(map[string]struct {
@@ -204,5 +253,31 @@ func TestHookRunnerService_RunHooksParallel_MixedResults(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected OnFailureMessage to be logged, messages=%v", mockLogger.Messages)
+	}
+}
+
+func TestHookRunnerService_RunHooks_ShowsOutputOnSuccessWhenShowOnAlways(t *testing.T) {
+	mockRunner := &MockShellRunner{Commands: map[string]struct {
+		Output string
+		Err    error
+	}{
+		"pytest": {"5 passed in 0.42s", nil},
+	}}
+	mockLogger := &MockLogger{}
+	service := NewHookRunnerService(mockRunner, mockLogger)
+
+	hooks := []domain.Hook{
+		{Name: "Tests", Command: "pytest", OutputRules: domain.OutputRules{ShowOn: "always"}},
+	}
+	service.RunHooks(hooks)
+
+	found := false
+	for _, m := range mockLogger.Messages {
+		if m == "5 passed in 0.42s" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected output to be logged on success when ShowOn=always, messages=%v", mockLogger.Messages)
 	}
 }

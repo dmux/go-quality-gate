@@ -18,6 +18,11 @@ func (r *RealShellRunner) Run(command string) (string, error) {
 	return string(output), err
 }
 
+// statFile is os.Stat, swappable in tests to exercise the "none of the
+// common shells exist" fallback without depending on this machine's
+// filesystem actually lacking /bin/zsh, /bin/bash, and /bin/sh.
+var statFile = os.Stat
+
 // getPreferredShell returns the preferred shell to use, falling back to bash if not found.
 
 func getPreferredShell() string {
@@ -28,7 +33,7 @@ func getPreferredShell() string {
 	// Try common shells in order of preference
 	shells := []string{"/bin/zsh", "/bin/bash", "/bin/sh"}
 	for _, shell := range shells {
-		if _, err := os.Stat(shell); err == nil {
+		if _, err := statFile(shell); err == nil {
 			return shell
 		}
 	}
