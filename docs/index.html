@@ -249,7 +249,9 @@ h1 .grad{background:linear-gradient(96deg,var(--blue) 10%,var(--accent) 92%);-we
 
 /* ---------- install strip ---------- */
 .install{margin-top:34px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;max-width:640px}
-.cmd{display:flex;align-items:center;gap:12px;background:var(--code);border-radius:12px;padding:13px 13px 13px 16px;box-shadow:var(--shadow)}
+.cmd{display:flex;flex-direction:column;gap:8px;background:var(--code);border-radius:12px;padding:11px 13px 13px 16px;box-shadow:var(--shadow)}
+.cmd-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cmd-line{display:flex;align-items:center;gap:12px}
 .cmd code{color:#DCE6F7;font-size:14px;overflow-x:auto;white-space:nowrap;flex:1;min-width:0}
 .cmd .p{color:#5F7CA8;user-select:none}
 .cmd .tag{font:500 11px/1 "JetBrains Mono",monospace;color:#7E9DCB;border:1px solid #233A5E;border-radius:6px;padding:5px 7px;white-space:nowrap}
@@ -521,22 +523,24 @@ td.desc{color:var(--text-muted)}
 
         <div class="install">
           <div class="cmd">
-            <span class="p">$</span>
-            <code id="cmd-goinstall">go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest</code>
-            <span class="tag">Go install</span>
-            <button class="copy" data-copy="#cmd-goinstall" aria-label="Copy install command">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-              Copy
-            </button>
+            <div class="cmd-top">
+              <span class="tag">Go install</span>
+              <button class="copy" data-copy="#cmd-goinstall" aria-label="Copy install command">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-line"><span class="p">$</span><code id="cmd-goinstall">go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest</code></div>
           </div>
           <div class="cmd">
-            <span class="p">$</span>
-            <code id="cmd-docker">docker run --rm ghcr.io/dmux/go-quality-gate:latest --version</code>
-            <span class="tag">Docker</span>
-            <button class="copy" data-copy="#cmd-docker" aria-label="Copy docker command">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-              Copy
-            </button>
+            <div class="cmd-top">
+              <span class="tag">Docker</span>
+              <button class="copy" data-copy="#cmd-docker" aria-label="Copy docker command">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-line"><span class="p">$</span><code id="cmd-docker">docker run --rm ghcr.io/dmux/go-quality-gate:latest --version</code></div>
           </div>
         </div>
 
