@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -65,17 +66,38 @@ func TestRealGitRepository_InstallHook_NotAGitRepo(t *testing.T) {
 	}
 }
 
-func TestRealGitRepository_InstallHook_CreateFails(t *testing.T) {
+func TestRealGitRepository_InstallHook_CreatesMissingHooksDir(t *testing.T) {
 	root := t.TempDir()
-	// .git exists but .git/hooks does not, so os.Create fails (ENOENT).
+	// .git exists but .git/hooks does not; InstallHook creates it, since
+	// core.hooksPath may point at a directory that doesn't exist yet.
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
 
 	repo := &RealGitRepository{}
+	if err := repo.InstallHook("pre-commit", "content"); err != nil {
+		t.Fatalf("expected the hooks directory to be created, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".git", "hooks", "pre-commit")); err != nil {
+		t.Fatalf("hook not written: %v", err)
+	}
+}
+
+func TestRealGitRepository_InstallHook_HooksDirIsAFile(t *testing.T) {
+	root := t.TempDir()
+	// A regular file where the hooks directory should be makes MkdirAll fail.
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "hooks"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	repo := &RealGitRepository{}
 	if err := repo.InstallHook("pre-commit", "content"); err == nil {
-		t.Fatal("expected an error when the hooks directory doesn't exist")
+		t.Fatal("expected an error when the hooks directory can't be created")
 	}
 }
 
@@ -284,5 +306,44 @@ func TestRealGitRepository_SaveToolsHash_CloseFails(t *testing.T) {
 	repo := &RealGitRepository{}
 	if err := repo.SaveToolsHash("hash"); err == nil {
 		t.Fatal("expected an error when closing the temp file fails")
+	}
+}
+
+func TestRealGitRepository_InstallHook_IgnoresGlobalHooksPath(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	// Resolve symlinks (macOS /var -> /private/var) so paths compare equal.
+	globalHooks, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	globalConfig := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(globalConfig, []byte("[core]\n\thooksPath = "+globalHooks+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", globalConfig)
+
+	root := t.TempDir()
+	t.Chdir(root)
+	if out, err := exec.Command("git", "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+
+	repo := &RealGitRepository{}
+	if err := repo.InstallHook("pre-commit", "content"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A per-repository install must never overwrite hooks shared by every
+	// repository through a global core.hooksPath.
+	if _, err := os.Stat(filepath.Join(globalHooks, "pre-commit")); !os.IsNotExist(err) {
+		t.Fatalf("hook was written to the global hooks path (stat err: %v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".git", "hooks", "pre-commit")); err != nil {
+		t.Fatalf("hook not written to the repository: %v", err)
+	}
+	if dir, err := repo.HooksDir(); err != nil || filepath.Clean(dir) != filepath.Clean(globalHooks) {
+		t.Fatalf("HooksDir = %q, %v; want the effective global path %q", dir, err, globalHooks)
 	}
 }

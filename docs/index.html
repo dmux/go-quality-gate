@@ -480,9 +480,10 @@ td.desc{color:var(--text-muted)}
 
 <header class="hdr" id="hdr">
   <div class="wrap nav">
-    <a class="brand" href="#top"><img src="gopher.png" alt="" width="32" height="32" />Go Quality Gate <span class="v">v1.2.3</span></a>
+    <a class="brand" href="#top"><img src="gopher.png" alt="" width="32" height="32" />Go Quality Gate <span class="v">v1.3.0</span></a>
     <nav class="nav-links" id="navlinks">
       <a href="#features">Features</a>
+      <a href="#watermark">Watermark</a>
       <a href="#dashboard">Dashboard</a>
       <a href="#code">Code</a>
       <a href="#architecture">How it works</a>
@@ -660,7 +661,95 @@ td.desc{color:var(--text-muted)}
         <p>Seamless integration with pre-commit and pre-push hooks — quality checks run themselves.</p>
         <span class="tagline">pre-commit</span>
       </article>
+
+      <article class="card rv accent">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6l-8-3Z"/><path d="M9.5 11.5h5M9.5 14.5h3"/></svg></div>
+        <h3>Commit watermark</h3>
+        <p>Commits that passed the gates carry a <code>Quality-Gate</code> trailer bound to their exact content.</p>
+        <span class="tagline accent">New in v1.3.0</span>
+      </article>
+
+      <article class="card rv accent">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3>CI enforcement</h3>
+        <p><code>quality-gate verify</code> and a ready-made GitHub Action reject commits that skipped the gates.</p>
+        <span class="tagline accent">Required check</span>
+      </article>
+
+      <article class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 3.5v5a4.2 4.2 0 0 0 8.4 0v-5"/><path d="M9 12.7v2.8a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="11" r="2"/></svg></div>
+        <h3>Doctor &amp; global install</h3>
+        <p><code>doctor</code> spots missing or tampered hooks; <code>--install --global</code> gates every repo on a machine.</p>
+        <span class="tagline blue">Setup health</span>
+      </article>
     </div>
+  </div>
+</section>
+
+<!-- ============ WATERMARK (new in v1.3.0) ============ -->
+<section class="section" id="watermark">
+  <div class="wrap">
+    <div class="split">
+      <div class="rv">
+        <span class="kicker">New in v1.3.0</span>
+        <h2 style="font-size:clamp(26px,3.6vw,42px);margin-top:14px">Know which commits actually passed the gate.</h2>
+        <p style="margin-top:16px;font-size:18px;color:var(--text-muted)">
+          Git hooks can be skipped with <code>--no-verify</code>. Now every commit that passed your checks is
+          watermarked with a trailer bound to its exact content — and CI can refuse the ones that were not.
+        </p>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>pre-commit</b> runs your checks. A failure blocks the commit; on success, the hash of the staged content and of <code>quality.yml</code> is stored.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>You write the message</b> — with <code>-m</code> or your editor, as usual.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>commit-msg</b> confirms nothing changed since the checks ran and appends the <code>Quality-Gate</code> trailer.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>CI verifies</b> every commit of the pull request with <code>quality-gate verify</code> and re-runs the checks.</span></li>
+        </ul>
+      </div>
+
+      <div class="window rv">
+        <div class="window-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="window-title">terminal</span>
+          <button class="copy" data-copy="#wm-commit code" aria-label="Copy code">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            Copy
+          </button>
+        </div>
+        <pre id="wm-commit" data-lang="bash"><code># once per repository: pre-commit, commit-msg and pre-push
+quality-gate --install
+quality-gate doctor
+
+git commit -m "feat: add login"
+# ✅ Gitleaks passed (41ms)
+# 🔏 Commit watermarked by quality-gate.
+
+git log -1 --format='%(trailers)'
+# Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+
+quality-gate verify --range origin/main..HEAD
+# ✅ 85490328cede attested
+# All 1 commit(s) passed the quality gate.</code></pre>
+      </div>
+    </div>
+
+    <div class="table-wrap rv" style="margin-top:44px">
+      <table>
+        <thead><tr><th>Situation</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><code>git commit --no-verify</code></td><td class="desc">No hook runs, so the commit has no watermark. <code>verify</code> reports <b>missing</b>.</td></tr>
+          <tr><td><code>QG_SKIP="prod hotfix" git commit</code></td><td class="desc">Checks are skipped, but the commit records <code>Quality-Gate-Skipped: prod hotfix</code>. Accepted only with <code>--policy allow-skip</code>.</td></tr>
+          <tr><td><code>git commit --amend</code></td><td class="desc">Hooks run again and the watermark is replaced. With <code>--no-verify</code>, the old one no longer matches: <b>tree-mismatch</b>.</td></tr>
+          <tr><td>Rebase or cherry-pick that changes content</td><td class="desc">The old watermark no longer matches (<b>tree-mismatch</b>). Recommit with hooks enabled.</td></tr>
+          <tr><td>Staged files change after the checks</td><td class="desc">No watermark, with a warning. Commit again to re-run the checks.</td></tr>
+          <tr><td>Commit made by an AI agent via MCP</td><td class="desc"><code>run_quality_checks</code> records the watermark too.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note rv">
+      The watermark stops casual bypasses and leaves an audit trail, but a trailer can be typed by hand.
+      Make the <code>quality-gate</code> CI job a <b>required status check</b> — it re-runs the gates, and that is what makes them mandatory.
+      See the <a href="https://github.com/dmux/go-quality-gate/blob/main/docs/usage.md">usage guide</a> for the full walkthrough.
+    </p>
   </div>
 </section>
 
@@ -725,10 +814,11 @@ chmod +x quality-gate && sudo mv quality-gate /usr/local/bin/quality-gate
 cd your-project
 quality-gate --init
 
-# 3. Install the Git hooks
+# 3. Install the Git hooks (pre-commit, commit-msg, pre-push) and check them
 quality-gate --install
+quality-gate doctor
 
-# 4. That's it — quality checks now run automatically
+# 4. That's it — checks run automatically and the commit is watermarked
 git commit -m "feat: new feature"
 
 # Once you've run it a few times:
@@ -778,6 +868,15 @@ quality-gate --fix pre-commit
 # JSON output for CI/CD pipelines
 quality-gate --output=json pre-commit
 
+# Verify commit watermarks (e.g. in CI)
+quality-gate verify --range origin/main..HEAD
+
+# Skip the checks on purpose, leaving an audit trailer
+QG_SKIP="prod hotfix" git commit -m "fix: hotfix"
+
+# Gate every repository on this machine that has a quality.yml
+quality-gate --install --global
+
 # Streaks, achievements and time saved
 quality-gate stats
 
@@ -800,16 +899,18 @@ quality-gate --version</code></pre>
 on: [pull_request]
 
 jobs:
-  quality:
+  quality-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download quality-gate
-        run: |
-          curl -fsSL -o quality-gate https://github.com/dmux/go-quality-gate/releases/latest/download/quality-gate-linux-amd64
-          chmod +x quality-gate
-      - name: Run quality checks
-        run: ./quality-gate --output=json pre-commit</code></pre>
+        with:
+          fetch-depth: 0          # verify needs the PR commits
+      - uses: dmux/go-quality-gate@main
+        with:
+          policy: strict          # or allow-skip to accept QG_SKIP commits
+          run-checks: "true"      # re-run the checks, not just the watermark
+
+# Then mark the job as a required status check on main.</code></pre>
     </div>
   </div>
 </section>
@@ -1030,6 +1131,7 @@ quality-gate mcp
         <h4>Get started</h4>
         <ul>
           <li><a href="#code">Quickstart</a></li>
+          <li><a href="https://github.com/dmux/go-quality-gate/blob/main/docs/usage.md">Usage guide</a></li>
           <li><a href="https://github.com/dmux/go-quality-gate/releases/latest">Latest release</a></li>
           <li><a href="#tools">Supported tools</a></li>
           <li><a href="https://github.com/dmux/go-quality-gate/pkgs/container/go-quality-gate">Docker image</a></li>
@@ -1040,6 +1142,7 @@ quality-gate mcp
         <ul>
           <li><a href="#code">Configuration (quality.yml)</a></li>
           <li><a href="#architecture">How it works</a></li>
+          <li><a href="#watermark">Commit watermark</a></li>
           <li><a href="#agents">MCP server</a></li>
           <li><a href="#dashboard">Stats &amp; dashboard</a></li>
         </ul>
