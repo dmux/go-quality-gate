@@ -173,6 +173,7 @@ func main() {
 
 	if hookType == "mcp" {
 		mcpServer := mcp.NewMCPServer(qualityGate, cfg)
+		mcpServer.SetVersion(Version)
 		mcpServer.OnPass(func(hookType string, results []domain.ExecutionResult) error {
 			return recordAttestation(attestation, hookType, results)
 		})

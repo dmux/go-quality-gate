@@ -32,6 +32,8 @@ Uma ferramenta de controle de qualidade de código construída em Go, distribuí
 
 ## 🚀 Quick Start
 
+> 📖 Primeira vez? O [Guia de Uso](docs/usage.pt-BR.md) mostra a instalação e o fluxo de commit do dia a dia em poucos minutos.
+
 ### 1. Instalação
 
 ```bash
@@ -231,13 +233,13 @@ hooks:
 ```bash
 # Versão simples
 ./quality-gate --version
-# Output: quality-gate version 1.2.0
+# Output: quality-gate version 1.3.0
 
 # Versão em JSON com detalhes de build
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -286,6 +288,31 @@ jobs:
 ```
 
 > O watermark do cliente barra bypass casual; não é prova criptográfica, já que qualquer um pode digitar um trailer. O check obrigatório no CI, que também re-executa os gates, é o que torna o gate mandatório. Squash merge cria um commit novo sem trailer, então verifique os commits do pull request, não o commit de merge.
+
+**Commit passo a passo**
+
+```bash
+quality-gate --install   # uma vez por repositório (instala pre-commit, commit-msg, pre-push)
+quality-gate doctor      # confere binário, hooks e quality.yml
+
+git add .
+git commit -m "feat: adiciona login"
+```
+
+1. `pre-commit` roda os checks. Uma falha bloqueia o commit; se passar, os hashes do tree em stage e do `quality.yml` são guardados.
+2. Você escreve a mensagem.
+3. `commit-msg` confirma que nada mudou e acrescenta o trailer `Quality-Gate:` (`🔏 Commit watermarked by quality-gate.`).
+4. O commit é criado. Confira com `git log -1 --format='%(trailers)'` ou `quality-gate verify --range HEAD`.
+
+| Situação | Resultado |
+|---|---|
+| `git commit --no-verify` | Sem trailer → `missing` no CI |
+| `QG_SKIP="motivo" git commit` | `Quality-Gate-Skipped: motivo` → aceito só com `--policy allow-skip` |
+| `--amend` / rebase que muda o conteúdo sem os hooks | O trailer antigo deixa de bater → `tree-mismatch` |
+| Conteúdo em stage mudou entre os checks e a mensagem | Sem trailer, com aviso — faça o commit de novo |
+| Commit pelo servidor MCP | Também recebe o watermark |
+
+O hook `commit-msg` nunca bloqueia o commit; quem barra é o CI.
 
 **Tornando a instalação automática**
 

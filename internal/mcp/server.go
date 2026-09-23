@@ -15,13 +15,20 @@ type MCPServer struct {
 	qgService *service.QualityGateService
 	cfg       *config.Config
 	onPass    func(hookType string, results []domain.ExecutionResult) error
+	version   string
 }
 
 func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config) *MCPServer {
 	return &MCPServer{
 		qgService: qgService,
 		cfg:       cfg,
+		version:   "dev",
 	}
+}
+
+// SetVersion sets the version reported to MCP clients.
+func (s *MCPServer) SetVersion(version string) {
+	s.version = version
 }
 
 // OnPass registers a callback run after a fully passing check, used to record
@@ -33,7 +40,7 @@ func (s *MCPServer) OnPass(fn func(hookType string, results []domain.ExecutionRe
 func (s *MCPServer) Start() error {
 	mcpServer := server.NewMCPServer(
 		"go-quality-gate",
-		"1.2.0", // TODO: inject version
+		s.version,
 	)
 
 	runQualityChecksTool := mcp.NewTool("run_quality_checks",

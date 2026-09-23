@@ -33,6 +33,8 @@ A code quality control tool built in Go, distributed as a single binary with no 
 
 ## 🚀 Quick Start
 
+> 📖 New here? The [Usage Guide](docs/usage.md) walks through setup and the daily commit flow in a few minutes.
+
 ### 1. Installation
 
 #### Option A: Download Pre-built Binary (Recommended)
@@ -278,13 +280,13 @@ hooks:
 ```bash
 # Simple version
 ./quality-gate --version
-# Output: quality-gate version 1.2.0
+# Output: quality-gate version 1.3.0
 
 # JSON version with build details
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -333,6 +335,31 @@ jobs:
 ```
 
 > The client watermark stops casual bypasses; it is not a cryptographic proof, since anyone can type a trailer. The required CI check, which also re-runs the gates, is what makes the gate mandatory. Squash merges create a new commit without a trailer, so verify the pull request commits, not the merge commit.
+
+**Committing step by step**
+
+```bash
+quality-gate --install   # once per repository (installs pre-commit, commit-msg, pre-push)
+quality-gate doctor      # confirm binary, hooks and quality.yml are in place
+
+git add .
+git commit -m "feat: add login"
+```
+
+1. `pre-commit` runs the checks. A failure blocks the commit; on success the staged tree and `quality.yml` hashes are stored.
+2. You write the message.
+3. `commit-msg` confirms nothing changed and appends the `Quality-Gate:` trailer (`🔏 Commit watermarked by quality-gate.`).
+4. The commit is created. Check it with `git log -1 --format='%(trailers)'` or `quality-gate verify --range HEAD`.
+
+| Situation | Result |
+|---|---|
+| `git commit --no-verify` | No trailer → `missing` in CI |
+| `QG_SKIP="reason" git commit` | `Quality-Gate-Skipped: reason` → accepted only with `--policy allow-skip` |
+| `--amend` / rebase that changes content without the hooks | Old trailer no longer matches → `tree-mismatch` |
+| Staged content changed between checks and message | No trailer, with a warning — commit again |
+| Commit through the MCP server | Watermarked as well |
+
+The `commit-msg` hook never blocks a commit; enforcement happens in CI.
 
 **Making installation automatic**
 
