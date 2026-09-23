@@ -33,6 +33,8 @@ A code quality control tool built in Go, distributed as a single binary with no 
 
 ## 🚀 Quick Start
 
+> 📖 New here? The [Usage Guide](docs/usage.md) walks through setup and the daily commit flow in a few minutes.
+
 ### 1. Installation
 
 #### Option A: Download Pre-built Binary (Recommended)
@@ -266,6 +268,9 @@ hooks:
 | `--install`     | Installs Git hooks in repository                        | `./quality-gate --install`                |
 | `--init`        | Generates initial quality.yml with intelligent analysis | `./quality-gate --init`                   |
 | `--fix`         | Executes automatic fixes                                | `./quality-gate --fix pre-commit`         |
+| `--install --global` | Gates every repository of the user (global `core.hooksPath`) | `./quality-gate --install --global` |
+| `verify`        | Verifies commit watermarks (for CI)                     | `./quality-gate verify --range origin/main..HEAD` |
+| `doctor`        | Checks hooks, binary and quality.yml are in place       | `./quality-gate doctor`                   |
 | `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
@@ -275,17 +280,93 @@ hooks:
 ```bash
 # Simple version
 ./quality-gate --version
-# Output: quality-gate version 1.2.0
+# Output: quality-gate version 1.3.0
 
 # JSON version with build details
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
 ```
+
+## 🔏 Enforcement and Commit Watermark
+
+Client-side hooks can always be bypassed (`git commit --no-verify`, deleting the hook). quality-gate therefore works in two layers:
+
+**1. Watermark on the client.** When every `pre-commit` check passes, quality-gate records an attestation bound to the exact staged content (`git write-tree`). The `commit-msg` hook then appends a trailer:
+
+```
+feat: add login
+
+Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+```
+
+- `--no-verify` skips both hooks, so the commit has **no** trailer.
+- Amending or rebasing without re-running the checks changes the tree, so the trailer **no longer matches**.
+- Need to bypass on purpose? `QG_SKIP="prod hotfix" git commit …` skips the checks but records `Quality-Gate-Skipped: prod hotfix` for auditing.
+
+**2. Enforcement on the server.** `quality-gate verify` checks every commit of a range and fails on missing, stale or malformed watermarks:
+
+```bash
+quality-gate verify --range origin/main..HEAD                    # strict
+quality-gate verify --range origin/main..HEAD --policy allow-skip # accept QG_SKIP commits
+quality-gate verify --range origin/main..HEAD --output json
+```
+
+Use the bundled GitHub Action, then mark the job as a **required status check** in the branch protection / ruleset of `main`:
+
+```yaml
+name: Quality Gate
+on: pull_request
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dmux/go-quality-gate@main
+        with:
+          policy: strict        # or allow-skip
+          run-checks: "true"    # re-run the checks, so a hand-written trailer cannot pass
+```
+
+> The client watermark stops casual bypasses; it is not a cryptographic proof, since anyone can type a trailer. The required CI check, which also re-runs the gates, is what makes the gate mandatory. Squash merges create a new commit without a trailer, so verify the pull request commits, not the merge commit.
+
+**Committing step by step**
+
+```bash
+quality-gate --install   # once per repository (installs pre-commit, commit-msg, pre-push)
+quality-gate doctor      # confirm binary, hooks and quality.yml are in place
+
+git add .
+git commit -m "feat: add login"
+```
+
+1. `pre-commit` runs the checks. A failure blocks the commit; on success the staged tree and `quality.yml` hashes are stored.
+2. You write the message.
+3. `commit-msg` confirms nothing changed and appends the `Quality-Gate:` trailer (`🔏 Commit watermarked by quality-gate.`).
+4. The commit is created. Check it with `git log -1 --format='%(trailers)'` or `quality-gate verify --range HEAD`.
+
+| Situation | Result |
+|---|---|
+| `git commit --no-verify` | No trailer → `missing` in CI |
+| `QG_SKIP="reason" git commit` | `Quality-Gate-Skipped: reason` → accepted only with `--policy allow-skip` |
+| `--amend` / rebase that changes content without the hooks | Old trailer no longer matches → `tree-mismatch` |
+| Staged content changed between checks and message | No trailer, with a warning — commit again |
+| Commit through the MCP server | Watermarked as well |
+
+The `commit-msg` hook never blocks a commit; enforcement happens in CI.
+
+**Making installation automatic**
+
+- `quality-gate --install --global` sets a global `core.hooksPath` whose hooks act only in repositories that contain a `quality.yml` (and still run repository-local hooks). It can be distributed to every machine by IT/MDM.
+- Add `quality-gate --install` to the project bootstrap (`"prepare"` script in `package.json`, `make setup`, etc.).
+- `quality-gate doctor` reports missing or tampered hooks.
+- The MCP server records the attestation too, so commits made by AI agents are watermarked.
 
 ## 🎯 JSON Output for CI/CD
 

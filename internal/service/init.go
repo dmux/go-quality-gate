@@ -141,8 +141,9 @@ func (s *InitService) printDetectedStructure(structure *ProjectStructure) {
 func (s *InitService) printNextSteps() {
 	fmt.Println("\n🚀 Next steps:")
 	fmt.Println("   1. Review and customize the generated quality.yml")
-	fmt.Println("   2. Install the required tools: ./quality-gate --install")
-	fmt.Println("   3. Set up git hooks: ./quality-gate --install-hooks")
-	fmt.Println("   4. Test the configuration: ./quality-gate pre-commit")
+	fmt.Println("   2. Set up git hooks: ./quality-gate --install")
+	fmt.Println("   3. Test the configuration: ./quality-gate pre-commit")
+	fmt.Println("   4. Enforce it: add the quality-gate GitHub Action as a required check")
 	fmt.Println("\n💡 Tip: Use './quality-gate --fix' to automatically fix formatting issues")
+	fmt.Println("💡 Tip: Run 'quality-gate --install' from your project bootstrap (package.json \"prepare\", make setup) so every clone gets the hooks")
 }

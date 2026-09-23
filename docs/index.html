@@ -73,6 +73,7 @@
           <a class="hover:opacity-80" href="#quick-start">QuickStart</a>
           <a class="hover:opacity-80" href="#installation">Installation</a>
           <a class="hover:opacity-80" href="#usage">Usage</a>
+          <a class="hover:opacity-80" href="#watermark">Watermark</a>
           <a class="hover:opacity-80" href="#configuration">Configuration</a>
           <a class="hover:opacity-80" href="#supported-tools">Tools</a>
         </nav>
@@ -225,6 +226,14 @@
             Seamless integration with Git pre-commit and pre-push hooks for automated quality checks.
           </p>
         </div>
+        <div
+          class="border border-blue-300 dark:border-blue-800 rounded-2xl p-5 shadow-sm"
+        >
+          <h3 class="font-semibold mb-2">🔏 Commit Watermark <span class="ml-1 align-middle text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">New in v1.3</span></h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            Every commit that passed the gates carries a verifiable <code>Quality-Gate</code> trailer. CI rejects commits that skipped them. <a class="text-blue-600 dark:text-blue-400 hover:underline" href="#watermark">Learn more →</a>
+          </p>
+        </div>
       </div>
     </section>
 
@@ -265,14 +274,15 @@ quality-gate --init</code></pre>
             <span class="font-semibold">Install Git hooks</span>
             <pre
               class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
-            ><code>quality-gate --install</code></pre>
+            ><code>quality-gate --install   # pre-commit, commit-msg and pre-push
+quality-gate doctor      # confirm everything is in place</code></pre>
           </li>
           <li>
             <span class="font-semibold">That's it! Now quality checks run automatically on git commit</span>
             <pre
               class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"
             ><code>git commit -m "feat: new feature"
-# Quality checks will run automatically</code></pre>
+# Quality checks run automatically and the commit gets a Quality-Gate watermark</code></pre>
           </li>
         </ol>
       </div>
@@ -377,12 +387,129 @@ quality-gate --version
 
 # Initialize new project
 quality-gate --init
+
+# Check hooks, binary and quality.yml
+quality-gate doctor
+
+# Verify commit watermarks (e.g. in CI)
+quality-gate verify --range origin/main..HEAD
+
+# Skip the checks on purpose, leaving an audit trailer
+QG_SKIP="prod hotfix" git commit -m "fix: hotfix"
 </code></pre>
+        <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-300">
+          New to the tool? Read the
+          <a class="text-blue-600 dark:text-blue-400 hover:underline" href="https://github.com/dmux/go-quality-gate/blob/main/docs/usage.md">Usage Guide</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- Commit Watermark -->
+    <section id="watermark" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 bg-zinc-50 dark:bg-zinc-900/50">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h2 class="text-3xl font-extrabold tracking-tight">🔏 Commit Watermark &amp; Enforcement</h2>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Git hooks can be skipped with <code>--no-verify</code>. Since v1.3, every commit that passed the gates is watermarked, and CI can refuse the ones that were not.
+        </p>
+      </div>
+
+      <div class="max-w-5xl mx-auto grid lg:grid-cols-2 gap-6">
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950">
+          <h3 class="font-semibold mb-3">How a commit works</h3>
+          <ol class="list-decimal list-inside space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
+            <li><strong>pre-commit</strong> runs your checks. A failure blocks the commit; on success, the hash of the staged content and of <code>quality.yml</code> is stored.</li>
+            <li>You write the commit message.</li>
+            <li><strong>commit-msg</strong> confirms nothing changed and appends the watermark trailer.</li>
+            <li>The commit is created, carrying proof of which content passed which configuration.</li>
+          </ol>
+          <pre class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"><code>git commit -m "feat: add login"
+✅ Gitleaks passed (41ms)
+🔏 Commit watermarked by quality-gate.
+
+git log -1 --format=%B
+feat: add login
+
+Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3</code></pre>
+        </div>
+
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950">
+          <h3 class="font-semibold mb-3">Enforce it in CI</h3>
+          <p class="text-sm text-zinc-600 dark:text-zinc-300">
+            The bundled GitHub Action verifies every commit of the pull request and re-runs the checks. Mark the job as a <strong>required status check</strong> on <code>main</code>.
+          </p>
+          <pre class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"><code>name: Quality Gate
+on: pull_request
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dmux/go-quality-gate@main
+        with:
+          policy: strict      # or allow-skip
+          run-checks: "true"</code></pre>
+          <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300">Any other CI:</p>
+          <pre class="rounded-xl bg-zinc-900 text-zinc-100 p-4 mt-2 overflow-x-auto text-sm shadow-md border border-zinc-800"><code>quality-gate verify --range origin/main..HEAD --output json</code></pre>
+        </div>
+      </div>
+
+      <div class="max-w-5xl mx-auto mt-6 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950 p-0 overflow-x-auto">
+        <table class="w-full text-sm text-zinc-600 dark:text-zinc-300">
+          <thead class="text-zinc-900 dark:text-zinc-100">
+            <tr>
+              <th class="text-left font-semibold px-4 py-2">Situation</th>
+              <th class="text-left font-semibold px-4 py-2">What happens</th>
+            </tr>
+          </thead>
+          <tbody>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap"><code>git commit --no-verify</code></td>
+                  <td class="px-4 py-2 align-top">No hook runs, so the commit has <strong>no</strong> watermark. CI reports <code>missing</code>.</td>
+                </tr>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap"><code>QG_SKIP="prod hotfix" git commit</code></td>
+                  <td class="px-4 py-2 align-top">Checks are skipped, but the commit gets <code>Quality-Gate-Skipped: prod hotfix</code>. Accepted only with <code>--policy allow-skip</code>.</td>
+                </tr>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap"><code>git commit --amend</code></td>
+                  <td class="px-4 py-2 align-top">Hooks run again and the watermark is replaced. With <code>--no-verify</code>, the old one no longer matches: <code>tree-mismatch</code>.</td>
+                </tr>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap">Rebase or cherry-pick that changes content</td>
+                  <td class="px-4 py-2 align-top">The old watermark no longer matches (<code>tree-mismatch</code>). Recommit with hooks enabled.</td>
+                </tr>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap">Staged files change between checks and message</td>
+                  <td class="px-4 py-2 align-top">No watermark, with a warning. Commit again.</td>
+                </tr>
+                <tr class="border-t border-zinc-200 dark:border-zinc-800">
+                  <td class="px-4 py-2 align-top whitespace-nowrap">Commit made by an AI agent via MCP</td>
+                  <td class="px-4 py-2 align-top"><code>run_quality_checks</code> records the watermark too.</td>
+                </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="max-w-5xl mx-auto mt-6 grid md:grid-cols-3 gap-6 text-sm text-zinc-600 dark:text-zinc-300">
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950">
+          <h3 class="font-semibold mb-2 text-zinc-900 dark:text-zinc-100">🌍 Install once, everywhere</h3>
+          <p><code>quality-gate --install --global</code> gates every repository on the machine that has a <code>quality.yml</code>, while still running local hooks.</p>
+        </div>
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950">
+          <h3 class="font-semibold mb-2 text-zinc-900 dark:text-zinc-100">🩺 Doctor</h3>
+          <p><code>quality-gate doctor</code> reports a missing binary, missing or tampered hooks and an invalid <code>quality.yml</code>.</p>
+        </div>
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-950">
+          <h3 class="font-semibold mb-2 text-zinc-900 dark:text-zinc-100">⚖️ Honest limits</h3>
+          <p>A trailer can be typed by hand, so the watermark stops casual bypasses. The required CI check, which re-runs the gates, is what makes the gate mandatory.</p>
+        </div>
       </div>
     </section>
 
     <!-- Configuration -->
-    <section id="configuration" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 bg-zinc-50 dark:bg-zinc-900/50">
+    <section id="configuration" class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
       <div class="text-center max-w-2xl mx-auto mb-8">
         <h2 class="text-3xl font-extrabold tracking-tight">⚙️ Configuration</h2>
         <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
@@ -427,7 +554,7 @@ hooks:
     </section>
 
     <!-- Supported Tools -->
-    <section id="supported-tools" class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
+    <section id="supported-tools" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 bg-zinc-50 dark:bg-zinc-900/50">
       <div class="text-center max-w-2xl mx-auto mb-8">
         <h2 class="text-3xl font-extrabold tracking-tight">🛠️ Supported Tools</h2>
         <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
@@ -492,7 +619,6 @@ hooks:
         </div>
       </div>
     </section>
-    </section>
 
     <!-- Footer -->
     <footer class="border-t border-zinc-200 dark:border-zinc-800 py-10">
@@ -507,6 +633,7 @@ hooks:
         </div>
         <div class="flex items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
           <a href="https://github.com/dmux/go-quality-gate" class="hover:opacity-80">GitHub</a>
+          <a href="https://github.com/dmux/go-quality-gate/blob/main/docs/usage.md" class="hover:opacity-80">Usage Guide</a>
           <a href="https://github.com/dmux/go-quality-gate/issues" class="hover:opacity-80">Issues</a>
           <a href="https://github.com/dmux/go-quality-gate/blob/main/docs/contributing.md" class="hover:opacity-80">Contributing</a>
         </div>
@@ -547,6 +674,7 @@ hooks:
         "quality-gate --init",
         "quality-gate --install",
         "git commit -m 'feat: new feature'",
+        "quality-gate verify --range origin/main..HEAD",
         "quality-gate --fix pre-commit",
         "quality-gate --output=json pre-commit",
         "quality-gate --version",
