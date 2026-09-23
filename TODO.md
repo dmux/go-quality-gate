@@ -121,7 +121,15 @@
 - [x] Robust configuration validation
 - [x] Advanced color formatting
 
-### v1.3.x - Robustness and Logs
+### v1.3.x - Enforcement and Commit Watermark ✅
+
+- [x] `commit-msg` hook adding a `Quality-Gate` trailer bound to the committed tree
+- [x] Auditable bypass with `QG_SKIP` (`Quality-Gate-Skipped` trailer)
+- [x] `verify` command and reusable GitHub Action for CI enforcement
+- [x] `doctor` command and `--install --global`
+- [x] MCP server version injected from the build
+
+### v1.4.x - Robustness and Logs
 
 - [ ] Structured logging system
 - [ ] Advanced error handling
@@ -179,8 +187,8 @@ go test ./internal/service -v
 
 ---
 
-**Last update**: October 21st, 2025  
-**Current version**: v1.2.x (Sprint 2 complete - Intelligent Analysis)
+**Last update**: September 22nd, 2026  
+**Current version**: v1.3.x (Enforcement and Commit Watermark)
 
 ## 🎉 Sprint 2 - COMPLETED
 

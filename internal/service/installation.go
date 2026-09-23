@@ -4,9 +4,62 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dmux/go-quality-gate/internal/repository"
 )
+
+// HookMarker identifies hooks written by quality-gate so tampering or
+// replacement can be detected.
+const HookMarker = "# quality-gate-managed"
+
+// ManagedHooks lists the hooks quality-gate installs, in install order.
+var ManagedHooks = []string{"pre-commit", "commit-msg", "pre-push"}
+
+var hookArgs = map[string]string{
+	"pre-commit": `pre-commit`,
+	"commit-msg": `commit-msg "$1"`,
+	"pre-push":   `pre-push`,
+}
+
+// HookContent returns the script installed in a repository for a hook. The
+// hook invokes the quality-gate binary by its absolute path rather than by
+// name, so it isn't subject to PATH lookup at commit/push time.
+func HookContent(hookType, binary string) string {
+	return fmt.Sprintf("#!/bin/sh\n%s\nexec %s %s\n", HookMarker, binary, hookArgs[hookType])
+}
+
+// GlobalHookContent returns the script installed in a global core.hooksPath.
+// It only acts in repositories that have a quality.yml, and still runs any
+// repository-local hook that quality-gate does not manage, since a global
+// hooks path disables .git/hooks.
+func GlobalHookContent(hookType, binary string) string {
+	return fmt.Sprintf(`#!/bin/sh
+%s global
+local_hook="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/%s"
+if [ -x "$local_hook" ] && ! grep -q "%s" "$local_hook"; then
+	"$local_hook" "$@" || exit $?
+fi
+[ -f "$(git rev-parse --show-toplevel)/quality.yml" ] || exit 0
+exec %s %s
+`, HookMarker, hookType, HookMarker, binary, hookArgs[hookType])
+}
+
+// IsManagedHook reports whether a hook script was written by quality-gate.
+func IsManagedHook(content string) bool {
+	return strings.Contains(content, HookMarker)
+}
+
+// HookBinary returns the binary a managed hook executes, or "" if none.
+func HookBinary(content string) string {
+	for _, line := range strings.Split(content, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "exec" {
+			return fields[1]
+		}
+	}
+	return ""
+}
 
 // InstallationService is responsible for installing the git hooks.
 
@@ -28,10 +81,17 @@ var (
 	evalSymlinks = filepath.EvalSymlinks
 )
 
-// InstallHooks installs the pre-commit and pre-push git hooks. The hooks
-// invoke the quality-gate binary by its resolved absolute path rather than
-// by name, so they aren't subject to PATH lookup at commit/push time.
+// InstallHooks installs the pre-commit, commit-msg and pre-push git hooks.
 func (s *InstallationService) InstallHooks() error {
+	return s.install(HookContent)
+}
+
+// InstallGlobalHooks installs the hooks into a global hooks directory.
+func (s *InstallationService) InstallGlobalHooks() error {
+	return s.install(GlobalHookContent)
+}
+
+func (s *InstallationService) install(content func(hookType, binary string) string) error {
 	execPath, err := osExecutable()
 	if err != nil {
 		return fmt.Errorf("failed to resolve executable path: %w", err)
@@ -42,16 +102,10 @@ func (s *InstallationService) InstallHooks() error {
 		return fmt.Errorf("failed to resolve symlink: %w", err)
 	}
 
-	preCommitContent := fmt.Sprintf("#!/bin/sh\nexec %s pre-commit\n", realPath)
-	prePushContent := fmt.Sprintf("#!/bin/sh\nexec %s pre-push\n", realPath)
-
-	if err := s.gitRepo.InstallHook("pre-commit", preCommitContent); err != nil {
-		return fmt.Errorf("failed to install pre-commit hook: %w", err)
+	for _, hook := range ManagedHooks {
+		if err := s.gitRepo.InstallHook(hook, content(hook, realPath)); err != nil {
+			return fmt.Errorf("failed to install %s hook: %w", hook, err)
+		}
 	}
-
-	if err := s.gitRepo.InstallHook("pre-push", prePushContent); err != nil {
-		return fmt.Errorf("failed to install pre-push hook: %w", err)
-	}
-
 	return nil
 }

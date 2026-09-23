@@ -1,0 +1,76 @@
+name: "Go Quality Gate"
+description: "Verify that every commit passed the quality gates (Quality-Gate watermark) and re-run the checks in CI."
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  version:
+    description: "quality-gate release to use (e.g. v1.3.0) or 'latest'."
+    default: "latest"
+  range:
+    description: "Revision range to verify. Defaults to the pull request commits, or the pushed commits."
+    default: ""
+  policy:
+    description: "strict (every commit attested) or allow-skip (also accept Quality-Gate-Skipped commits)."
+    default: "strict"
+  run-checks:
+    description: "Also re-run the pre-commit checks in CI, so a forged watermark cannot pass."
+    default: "true"
+  hook:
+    description: "Hook type re-run in CI when run-checks is true."
+    default: "pre-commit"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install quality-gate
+      shell: bash
+      env:
+        QG_VERSION: ${{ inputs.version }}
+        QG_REPO: dmux/go-quality-gate
+      run: |
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$arch" in x86_64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; esac
+        if [ "$QG_VERSION" = "latest" ]; then
+          url="https://github.com/$QG_REPO/releases/latest/download/quality-gate-$os-$arch"
+        else
+          url="https://github.com/$QG_REPO/releases/download/$QG_VERSION/quality-gate-$os-$arch"
+        fi
+        mkdir -p "$RUNNER_TEMP/quality-gate"
+        curl -fsSL "$url" -o "$RUNNER_TEMP/quality-gate/quality-gate"
+        chmod +x "$RUNNER_TEMP/quality-gate/quality-gate"
+        echo "$RUNNER_TEMP/quality-gate" >> "$GITHUB_PATH"
+
+    - name: Verify commit watermarks
+      shell: bash
+      env:
+        QG_RANGE: ${{ inputs.range }}
+        QG_POLICY: ${{ inputs.policy }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        PUSH_BEFORE: ${{ github.event.before }}
+      run: |
+        range="$QG_RANGE"
+        if [ -z "$range" ]; then
+          if [ -n "$PR_BASE" ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [ -n "$PUSH_BEFORE" ] && ! echo "$PUSH_BEFORE" | grep -qE '^0+$'; then
+            range="$PUSH_BEFORE..$GITHUB_SHA"
+          else
+            range="$GITHUB_SHA"
+          fi
+        fi
+        if ! git cat-file -e "${range%%..*}^{commit}" 2>/dev/null; then
+          echo "::error::Commit ${range%%..*} is not available; use actions/checkout with fetch-depth: 0."
+          exit 1
+        fi
+        quality-gate verify --range "$range" --policy "$QG_POLICY"
+
+    - name: Re-run quality checks
+      if: inputs.run-checks == 'true'
+      shell: bash
+      env:
+        QG_HOOK: ${{ inputs.hook }}
+      run: quality-gate --output=json "$QG_HOOK"
