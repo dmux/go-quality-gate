@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/dmux/go-quality-gate/internal/config"
@@ -23,6 +25,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Show version information")
 	versionFlagShort := flag.Bool("v", false, "Show version information (shorthand)")
 	outputFlag := flag.String("output", "", "Output format (e.g., json)")
+	globalFlag := flag.Bool("global", false, "With --install, install hooks for every repository of this user")
 
 	flag.Parse()
 
@@ -73,6 +76,14 @@ func main() {
 	}
 
 	if *installFlag {
+		if *globalFlag {
+			if err := installGlobalHooks(); err != nil {
+				logPrint("Error installing global git hooks: %v\n", err)
+				os.Exit(1)
+			}
+			logPrintln("Global git hooks installed; every repository with a quality.yml is now gated.")
+			return
+		}
 		logPrintln("Installing git hooks...")
 		gitRepo := &git.RealGitRepository{}
 		installationService := service.NewInstallationService(gitRepo)
@@ -101,10 +112,14 @@ func main() {
 		logPrintln("Hook Types:")
 		logPrintln("  pre-commit    Run pre-commit quality checks")
 		logPrintln("  pre-push      Run pre-push quality checks")
+		logPrintln("  commit-msg    Watermark a commit message (called by the git hook)")
+		logPrintln("  verify        Verify commit watermarks (e.g. in CI)")
+		logPrintln("  doctor        Check that hooks and configuration are installed")
 		logPrintln("  mcp           Start Model Context Protocol (MCP) server")
 		logPrintln("")
 		logPrintln("Options:")
 		logPrintln("  --install     Install git hooks in the current repository")
+		logPrintln("  --global      With --install, gate every repository of this user")
 		logPrintln("  --init        Initialize quality.yml with intelligent analysis")
 		logPrintln("  --fix         Automatically fix detected issues")
 		logPrintln("  --version, -v Show version information")
@@ -115,11 +130,34 @@ func main() {
 		logPrintln("  quality-gate --install           # Install git hooks")
 		logPrintln("  quality-gate pre-commit          # Run pre-commit checks")
 		logPrintln("  quality-gate --fix pre-commit    # Fix issues and run checks")
+		logPrintln("  quality-gate verify --range origin/main..HEAD  # Check watermarks")
+		logPrintln("  QG_SKIP=\"reason\" git commit      # Skip checks, leaving an audit trailer")
 		logPrintln("  quality-gate --version           # Show version")
 		os.Exit(1)
 	}
 
 	hookType := args[0]
+	gitRepo := &git.RealGitRepository{}
+	attestation := service.NewAttestationService(gitRepo, gitRepo, Version)
+
+	switch hookType {
+	case "commit-msg":
+		if len(args) < 2 {
+			logPrintln("Usage: quality-gate commit-msg <message-file>")
+			os.Exit(1)
+		}
+		runCommitMsg(attestation, args[1])
+		return
+	case "verify":
+		os.Exit(runVerify(attestation, args[1:], *outputFlag))
+	case "doctor":
+		os.Exit(runDoctor(gitRepo, *outputFlag))
+	}
+
+	if skipReason := os.Getenv(service.SkipEnvVar); skipReason != "" && (hookType == "pre-commit" || hookType == "pre-push") {
+		logPrint("⚠️  Quality gate skipped (%s=%q); the commit will carry a %s trailer.\n", service.SkipEnvVar, skipReason, domain.SkipTrailer)
+		return
+	}
 
 	cfg, err := config.LoadConfig("quality.yml")
 	if err != nil {
@@ -129,13 +167,15 @@ func main() {
 
 	shellRunner := &shell.RealShellRunner{}
 	consoleLogger := logger.NewConsoleLogger(isJsonOutput)
-	gitRepo := &git.RealGitRepository{}
 	toolManager := service.NewCachingToolManagerService(shellRunner, consoleLogger, gitRepo)
 	hookRunner := service.NewHookRunnerService(shellRunner, consoleLogger)
 	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
 
 	if hookType == "mcp" {
 		mcpServer := mcp.NewMCPServer(qualityGate, cfg)
+		mcpServer.OnPass(func(hookType string, results []domain.ExecutionResult) error {
+			return recordAttestation(attestation, hookType, results)
+		})
 		if err := mcpServer.Start(); err != nil {
 			logPrint("Error starting MCP server: %v\n", err)
 			os.Exit(1)
@@ -163,6 +203,8 @@ func main() {
 		if *outputFlag != "json" {
 			os.Exit(1)
 		}
+	} else if attestErr := recordAttestation(attestation, hookType, results); attestErr != nil {
+		logPrint("⚠️  Could not record quality gate attestation: %v\n", attestErr)
 	}
 
 	if isJsonOutput && !isMCP {
@@ -210,4 +252,151 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+// recordAttestation stores the watermark for the commit being created. Only
+// pre-commit results describe the staged content, so other hooks are ignored.
+func recordAttestation(attestation *service.AttestationService, hookType string, results []domain.ExecutionResult) error {
+	if hookType != "pre-commit" {
+		return nil
+	}
+	configContent, err := os.ReadFile("quality.yml")
+	if err != nil {
+		return err
+	}
+	return attestation.Record(results, configContent)
+}
+
+// runCommitMsg watermarks the commit message. It never blocks the commit:
+// enforcement happens in CI through `quality-gate verify`.
+func runCommitMsg(attestation *service.AttestationService, messageFile string) {
+	configContent, _ := os.ReadFile("quality.yml")
+	outcome, err := attestation.Stamp(messageFile, configContent, os.Getenv(service.SkipEnvVar))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Could not watermark commit: %v\n", err)
+		return
+	}
+
+	switch outcome {
+	case service.StampAdded:
+		fmt.Fprintln(os.Stderr, "🔏 Commit watermarked by quality-gate.")
+	case service.StampSkipTrailerAdded:
+		fmt.Fprintf(os.Stderr, "⚠️  Quality gate skipped; recorded in the %s trailer.\n", domain.SkipTrailer)
+	case service.StampNoAttestation:
+		fmt.Fprintln(os.Stderr, "⚠️  No passing quality gate run found for this commit; it will not be watermarked and CI may reject it.")
+	case service.StampStale:
+		fmt.Fprintln(os.Stderr, "⚠️  Staged content or quality.yml changed after the checks ran; commit not watermarked. Commit again to re-run the checks.")
+	}
+}
+
+func runVerify(attestation *service.AttestationService, args []string, output string) int {
+	fs := flag.NewFlagSet("verify", flag.ExitOnError)
+	rangeSpec := fs.String("range", "HEAD", "Commit or revision range to verify (e.g. origin/main..HEAD)")
+	policy := fs.String("policy", "strict", "strict: every commit must be attested; allow-skip: also accept "+domain.SkipTrailer)
+	configPath := fs.String("config", "quality.yml", "Path of quality.yml relative to the repository root")
+	fs.StringVar(&output, "output", output, "Output format (e.g., json)")
+	_ = fs.Parse(args)
+
+	if *policy != "strict" && *policy != "allow-skip" {
+		fmt.Fprintf(os.Stderr, "Unknown policy %q (use strict or allow-skip)\n", *policy)
+		return 1
+	}
+
+	verifications, err := attestation.Verify(*rangeSpec, *configPath, *policy == "allow-skip")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error verifying commits: %v\n", err)
+		return 1
+	}
+
+	passed := true
+	for _, v := range verifications {
+		passed = passed && v.Accepted
+	}
+
+	if output == "json" {
+		status := "success"
+		if !passed {
+			status = "failure"
+		}
+		jsonBytes, _ := json.MarshalIndent(struct {
+			Status  string                      `json:"status"`
+			Range   string                      `json:"range"`
+			Policy  string                      `json:"policy"`
+			Commits []domain.CommitVerification `json:"commits"`
+		}{status, *rangeSpec, *policy, verifications}, "", "  ")
+		fmt.Println(string(jsonBytes))
+	} else {
+		for _, v := range verifications {
+			icon := "✅"
+			if !v.Accepted {
+				icon = "❌"
+			}
+			line := fmt.Sprintf("%s %.12s %s", icon, v.Commit, v.Status)
+			if v.SkipReason != "" {
+				line += fmt.Sprintf(" (reason: %s)", v.SkipReason)
+			}
+			if v.Detail != "" {
+				line += ": " + v.Detail
+			}
+			fmt.Println(line)
+		}
+		if len(verifications) == 0 {
+			fmt.Println("No commits to verify.")
+		} else if passed {
+			fmt.Printf("All %d commit(s) passed the quality gate.\n", len(verifications))
+		} else {
+			fmt.Println("Some commits did not pass the quality gate (were hooks skipped with --no-verify?).")
+		}
+	}
+
+	if !passed {
+		return 1
+	}
+	return 0
+}
+
+func runDoctor(gitRepo *git.RealGitRepository, output string) int {
+	checks := service.NewDoctorService(gitRepo, exec.LookPath, "quality.yml").Run()
+
+	healthy := true
+	for _, c := range checks {
+		healthy = healthy && c.OK
+	}
+
+	if output == "json" {
+		jsonBytes, _ := json.MarshalIndent(struct {
+			Healthy bool                  `json:"healthy"`
+			Checks  []service.DoctorCheck `json:"checks"`
+		}{healthy, checks}, "", "  ")
+		fmt.Println(string(jsonBytes))
+	} else {
+		for _, c := range checks {
+			icon := "✅"
+			if !c.OK {
+				icon = "❌"
+			}
+			if c.Detail != "" {
+				fmt.Printf("%s %s: %s\n", icon, c.Name, c.Detail)
+			} else {
+				fmt.Printf("%s %s\n", icon, c.Name)
+			}
+		}
+	}
+
+	if !healthy {
+		return 1
+	}
+	return 0
+}
+
+func installGlobalHooks() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(home, ".quality-gate", "hooks")
+	if err := service.NewInstallationService(&git.DirHookRepository{Dir: dir}).InstallGlobalHooks(); err != nil {
+		return err
+	}
+	return git.SetGlobalHooksPath(dir)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dmux/go-quality-gate/internal/config"
+	"github.com/dmux/go-quality-gate/internal/domain"
 	"github.com/dmux/go-quality-gate/internal/service"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -13,6 +14,7 @@ import (
 type MCPServer struct {
 	qgService *service.QualityGateService
 	cfg       *config.Config
+	onPass    func(hookType string, results []domain.ExecutionResult) error
 }
 
 func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config) *MCPServer {
@@ -20,6 +22,12 @@ func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config) *MC
 		qgService: qgService,
 		cfg:       cfg,
 	}
+}
+
+// OnPass registers a callback run after a fully passing check, used to record
+// the commit attestation so agent-made commits are watermarked too.
+func (s *MCPServer) OnPass(fn func(hookType string, results []domain.ExecutionResult) error) {
+	s.onPass = fn
 }
 
 func (s *MCPServer) Start() error {
@@ -84,6 +92,12 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 
 	if err != nil {
 		textOutput += fmt.Sprintf("\nExecution Error: %v\n", err)
+	}
+
+	if overallSuccess && err == nil && s.onPass != nil {
+		if passErr := s.onPass(hookType, results); passErr != nil {
+			textOutput += fmt.Sprintf("\nWarning: could not record attestation: %v\n", passErr)
+		}
 	}
 
 	if overallSuccess {

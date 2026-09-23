@@ -219,6 +219,9 @@ hooks:
 | `--install`     | Instala Git hooks no repositório                 | `./quality-gate --install`                |
 | `--init`        | Gera quality.yml inicial com análise inteligente | `./quality-gate --init`                   |
 | `--fix`         | Executa correções automáticas                    | `./quality-gate --fix pre-commit`         |
+| `--install --global` | Aplica o gate em todos os repositórios do usuário (`core.hooksPath` global) | `./quality-gate --install --global` |
+| `verify`        | Verifica o watermark dos commits (para CI)       | `./quality-gate verify --range origin/main..HEAD` |
+| `doctor`        | Confere hooks, binário e quality.yml             | `./quality-gate doctor`                   |
 | `mcp`           | Roda como um servidor MCP para integração com IA | `./quality-gate mcp`                      |
 | `--version, -v` | Mostra informações de versão                     | `./quality-gate --version`                |
 | `--output=json` | Output estruturado para CI/CD                    | `./quality-gate --output=json pre-commit` |
@@ -239,6 +242,57 @@ hooks:
   "git_commit": "f7b01a2"
 }
 ```
+
+## 🔏 Enforcement e Watermark nos Commits
+
+Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar o hook). Por isso o quality-gate trabalha em duas camadas:
+
+**1. Watermark no cliente.** Quando todos os checks do `pre-commit` passam, o quality-gate grava uma attestation vinculada ao conteúdo exato em stage (`git write-tree`). O hook `commit-msg` então adiciona um trailer:
+
+```
+feat: adiciona login
+
+Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+```
+
+- `--no-verify` pula os dois hooks, então o commit sai **sem** trailer.
+- Amend ou rebase sem rodar os checks de novo muda o tree, e o trailer **deixa de bater**.
+- Precisa pular de propósito? `QG_SKIP="hotfix produção" git commit …` pula os checks mas grava `Quality-Gate-Skipped: hotfix produção` para auditoria.
+
+**2. Enforcement no servidor.** `quality-gate verify` confere todos os commits de um range e falha em watermarks ausentes, desatualizados ou malformados:
+
+```bash
+quality-gate verify --range origin/main..HEAD                    # strict
+quality-gate verify --range origin/main..HEAD --policy allow-skip # aceita commits com QG_SKIP
+quality-gate verify --range origin/main..HEAD --output json
+```
+
+Use a GitHub Action incluída no repositório e marque o job como **required status check** na branch protection / ruleset da `main`:
+
+```yaml
+name: Quality Gate
+on: pull_request
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dmux/go-quality-gate@main
+        with:
+          policy: strict        # ou allow-skip
+          run-checks: "true"    # re-executa os checks, então um trailer escrito à mão não passa
+```
+
+> O watermark do cliente barra bypass casual; não é prova criptográfica, já que qualquer um pode digitar um trailer. O check obrigatório no CI, que também re-executa os gates, é o que torna o gate mandatório. Squash merge cria um commit novo sem trailer, então verifique os commits do pull request, não o commit de merge.
+
+**Tornando a instalação automática**
+
+- `quality-gate --install --global` configura um `core.hooksPath` global cujos hooks só agem em repositórios com `quality.yml` (e continuam rodando os hooks locais do repositório). Pode ser distribuído pela TI/MDM para todas as máquinas.
+- Adicione `quality-gate --install` ao bootstrap do projeto (script `"prepare"` no `package.json`, `make setup`, etc.).
+- `quality-gate doctor` aponta hooks ausentes ou adulterados.
+- O servidor MCP também grava a attestation, então commits feitos por agentes de IA saem com watermark.
 
 ## 🎯 Output JSON para CI/CD
 
