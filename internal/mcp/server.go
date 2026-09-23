@@ -18,17 +18,14 @@ type MCPServer struct {
 	version   string
 }
 
-func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config) *MCPServer {
+// NewMCPServer creates an MCPServer that reports version as its protocol
+// version to MCP clients (e.g. the running binary's main.Version).
+func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config, version string) *MCPServer {
 	return &MCPServer{
 		qgService: qgService,
 		cfg:       cfg,
-		version:   "dev",
+		version:   version,
 	}
-}
-
-// SetVersion sets the version reported to MCP clients.
-func (s *MCPServer) SetVersion(version string) {
-	s.version = version
 }
 
 // OnPass registers a callback run after a fully passing check, used to record
@@ -75,7 +72,7 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultError("hookType must be a string"), nil
 	}
 
-	results, err := s.qgService.Run(s.cfg, hookType)
+	results, err := s.qgService.Run(s.cfg, hookType, false)
 
 	// Create a text result with details of each check
 	var textOutput string

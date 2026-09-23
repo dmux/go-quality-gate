@@ -5,24 +5,25 @@ import (
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
+	"github.com/dmux/go-quality-gate/internal/repository"
 )
 
 // QualityGateService is the main service that orchestrates the quality gate process.
 
 type QualityGateService struct {
-	toolManager *ToolManagerService
-	hookRunner  *HookRunnerService
+	toolManager repository.ToolManager
+	hookRunner  repository.HookRunner
 }
 
 // NewQualityGateService creates a new QualityGateService.
 
-func NewQualityGateService(toolManager *ToolManagerService, hookRunner *HookRunnerService) *QualityGateService {
+func NewQualityGateService(toolManager repository.ToolManager, hookRunner repository.HookRunner) *QualityGateService {
 	return &QualityGateService{toolManager: toolManager, hookRunner: hookRunner}
 }
 
 // Run executes the quality gate process for a given hook type (e.g., "pre-commit").
 
-func (s *QualityGateService) Run(cfg *config.Config, hookType string) ([]domain.ExecutionResult, error) {
+func (s *QualityGateService) Run(cfg *config.Config, hookType string, parallel bool) ([]domain.ExecutionResult, error) {
 	// 1. Ensure all tools are installed.
 	if err := s.toolManager.EnsureToolsInstalled(s.configToolsToDomain(cfg.Tools)); err != nil {
 		return nil, fmt.Errorf("failed to ensure tools are installed: %w", err)
@@ -30,7 +31,12 @@ func (s *QualityGateService) Run(cfg *config.Config, hookType string) ([]domain.
 
 	// 2. Run the hooks for the given hook type.
 	hooksToRun := s.getHooksToRun(cfg.Hooks, hookType)
-	results := s.hookRunner.RunHooks(hooksToRun)
+	var results []domain.ExecutionResult
+	if parallel {
+		results = s.hookRunner.RunHooksParallel(hooksToRun)
+	} else {
+		results = s.hookRunner.RunHooks(hooksToRun)
+	}
 
 	// 3. Check the results and exit if any hook failed.
 	for _, result := range results {

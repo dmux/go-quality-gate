@@ -2,7 +2,9 @@ package service
 
 import (
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dmux/go-quality-gate/internal/domain"
 )
@@ -14,15 +16,42 @@ type MockShellRunner struct {
 		Output string
 		Err    error
 	}
+	Delays map[string]time.Duration // optional: Run sleeps this long for the given command
+
+	mu      sync.Mutex
+	current int
+	peak    int
 }
 
 // Run implements the ShellRunner interface.
 
 func (r *MockShellRunner) Run(command string) (string, error) {
+	r.mu.Lock()
+	r.current++
+	if r.current > r.peak {
+		r.peak = r.current
+	}
+	r.mu.Unlock()
+
+	if d, ok := r.Delays[command]; ok {
+		time.Sleep(d)
+	}
+
+	r.mu.Lock()
+	r.current--
+	r.mu.Unlock()
+
 	if cmd, ok := r.Commands[command]; ok {
 		return cmd.Output, cmd.Err
 	}
 	return "", errors.New("command not found")
+}
+
+// PeakConcurrency returns the maximum number of concurrent Run calls observed.
+func (r *MockShellRunner) PeakConcurrency() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.peak
 }
 
 func TestToolManagerService_EnsureToolsInstalled(t *testing.T) {

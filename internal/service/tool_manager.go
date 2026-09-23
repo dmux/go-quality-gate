@@ -35,10 +35,7 @@ func NewCachingToolManagerService(shellRunner repository.ShellRunner, logger log
 // EnsureToolsInstalled checks if all tools are installed and installs them if they are not.
 
 func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool) error {
-	toolsHash, err := hashTools(tools)
-	if err != nil {
-		return fmt.Errorf("failed to hash tools configuration: %w", err)
-	}
+	toolsHash := hashTools(tools)
 
 	if s.state != nil {
 		cachedHash, cacheErr := s.state.LoadToolsHash()
@@ -82,11 +79,11 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool) error {
 	return nil
 }
 
-func hashTools(tools []domain.Tool) (string, error) {
-	content, err := json.Marshal(tools)
-	if err != nil {
-		return "", err
-	}
+// hashTools fingerprints a tools configuration for the install-check cache.
+// The marshal error is intentionally ignored: domain.Tool has only string
+// fields, so json.Marshal on a []domain.Tool can never fail.
+func hashTools(tools []domain.Tool) string {
+	content, _ := json.Marshal(tools)
 	digest := sha256.Sum256(content)
-	return hex.EncodeToString(digest[:]), nil
+	return hex.EncodeToString(digest[:])
 }

@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,10 +19,22 @@ const (
 
 type RealGitRepository struct{}
 
+// createHookFile is os.Create, swappable in tests to exercise the
+// write-failure path in InstallHook, which a real OS-level write()
+// failure isn't practical to reproduce portably. *os.File satisfies
+// io.WriteCloser.
+var createHookFile = func(path string) (io.WriteCloser, error) {
+	return os.Create(path)
+}
+
+// chmodFile is os.Chmod, swappable in tests to exercise InstallHook's final
+// chmod-failure path without depending on OS-specific permission tricks.
+var chmodFile = os.Chmod
+
 // InstallHook implements the GitRepository interface.
 
 func (r *RealGitRepository) InstallHook(hookType string, content string) error {
-	hooksDir, err := r.HooksDir()
+	hooksDir, err := r.repositoryHooksDir()
 	if err != nil {
 		return err
 	}
@@ -31,18 +44,18 @@ func (r *RealGitRepository) InstallHook(hookType string, content string) error {
 
 	hookPath := filepath.Join(hooksDir, hookType)
 
-	f, err := os.Create(hookPath)
+	f, err := createHookFile(hookPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(content)
+	_, err = f.Write([]byte(content))
 	if err != nil {
 		return err
 	}
 
-	return os.Chmod(hookPath, 0755)
+	return chmodFile(hookPath, 0755)
 }
 
 // HooksDir returns the directory git reads hooks from, honouring
@@ -50,6 +63,24 @@ func (r *RealGitRepository) InstallHook(hookType string, content string) error {
 func (r *RealGitRepository) HooksDir() (string, error) {
 	if out, err := runGit("rev-parse", "--path-format=absolute", "--git-path", "hooks"); err == nil && out != "" {
 		return out, nil
+	}
+
+	gitDir, err := findGitDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(gitDir, "hooks"), nil
+}
+
+// repositoryHooksDir returns where a per-repository install writes hooks.
+// A core.hooksPath set outside the repository (e.g. by --install --global)
+// is shared by every repository, so it is never written to from here.
+func (r *RealGitRepository) repositoryHooksDir() (string, error) {
+	if _, err := runGit("config", "--local", "--get", "core.hooksPath"); err == nil {
+		return r.HooksDir()
+	}
+	if out, err := runGit("rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil && out != "" {
+		return filepath.Join(out, "hooks"), nil
 	}
 
 	gitDir, err := findGitDir()
@@ -175,6 +206,24 @@ func readState(relativePath string) ([]byte, error) {
 	return content, err
 }
 
+// tempWriteCloser is the subset of *os.File's methods writeStateAtomic needs
+// for its create-write-chmod-close-rename sequence, extracted so tests can
+// substitute a fake that fails on a specific step.
+type tempWriteCloser interface {
+	io.Writer
+	Chmod(mode os.FileMode) error
+	Close() error
+	Name() string
+}
+
+// createTempFile is os.CreateTemp, swappable in tests to exercise
+// writeStateAtomic's write/chmod/close failure paths, which real OS-level
+// failures on an already-created temp file aren't practical to reproduce
+// portably.
+var createTempFile = func(dir, pattern string) (tempWriteCloser, error) {
+	return os.CreateTemp(dir, pattern)
+}
+
 func writeStateAtomic(relativePath string, content []byte) error {
 	gitDir, err := findGitDir()
 	if err != nil {
@@ -187,7 +236,7 @@ func writeStateAtomic(relativePath string, content []byte) error {
 		return err
 	}
 
-	tempFile, err := os.CreateTemp(stateDir, "state-*.tmp")
+	tempFile, err := createTempFile(stateDir, "state-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -209,10 +258,15 @@ func writeStateAtomic(relativePath string, content []byte) error {
 	return os.Rename(tempPath, statePath)
 }
 
+// getwd is os.Getwd, swappable in tests to exercise findGitDir's error path
+// (os.Getwd failing is otherwise not reliably reproducible across
+// platforms — e.g. macOS still resolves a deleted cwd).
+var getwd = os.Getwd
+
 // findGitDir locates the git directory. In linked worktrees, where .git is a
 // file, git itself resolves the real directory.
 func findGitDir() (string, error) {
-	path, err := os.Getwd()
+	path, err := getwd()
 	if err != nil {
 		return "", err
 	}

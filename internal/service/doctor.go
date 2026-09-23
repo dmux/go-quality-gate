@@ -20,24 +20,17 @@ type DoctorCheck struct {
 // current repository, so a missing or tampered hook is caught early.
 type DoctorService struct {
 	hooks      repository.HookInspector
-	lookPath   func(string) (string, error)
 	configPath string
 }
 
 // NewDoctorService creates a new DoctorService.
-func NewDoctorService(hooks repository.HookInspector, lookPath func(string) (string, error), configPath string) *DoctorService {
-	return &DoctorService{hooks: hooks, lookPath: lookPath, configPath: configPath}
+func NewDoctorService(hooks repository.HookInspector, configPath string) *DoctorService {
+	return &DoctorService{hooks: hooks, configPath: configPath}
 }
 
 // Run executes every check. It never stops at the first failure.
 func (s *DoctorService) Run() []DoctorCheck {
 	var checks []DoctorCheck
-
-	if path, err := s.lookPath("quality-gate"); err != nil {
-		checks = append(checks, DoctorCheck{Name: "binary on PATH", Detail: "hooks call `quality-gate`, which is not on PATH"})
-	} else {
-		checks = append(checks, DoctorCheck{Name: "binary on PATH", OK: true, Detail: path})
-	}
 
 	hooksDir, err := s.hooks.HooksDir()
 	if err != nil {
@@ -66,6 +59,12 @@ func checkHook(path, hook string) DoctorCheck {
 	}
 	if !IsManagedHook(string(content)) {
 		return DoctorCheck{Name: name, Detail: path + " was not written by quality-gate; run `quality-gate --install`"}
+	}
+	// Hooks call the binary by absolute path, so a moved or deleted binary
+	// silently breaks them.
+	binary := HookBinary(string(content))
+	if info, err := os.Stat(binary); err != nil || info.IsDir() || info.Mode().Perm()&0111 == 0 {
+		return DoctorCheck{Name: name, Detail: fmt.Sprintf("runs %q, which is missing or not executable; run `quality-gate --install`", binary)}
 	}
 	return DoctorCheck{Name: name, OK: true, Detail: path}
 }
