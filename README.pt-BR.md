@@ -270,13 +270,13 @@ hooks:
 ```bash
 # Versão simples
 ./quality-gate --version
-# Output: quality-gate version 1.3.0
+# Output: quality-gate version 1.4.0
 
 # Versão em JSON com detalhes de build
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -291,7 +291,7 @@ Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar 
 ```
 feat: adiciona login
 
-Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 ```
 
 - `--no-verify` pula os dois hooks, então o commit sai **sem** trailer.

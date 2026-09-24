@@ -77,7 +77,7 @@ What happens behind the scenes:
    ```
    feat: add login
 
-   Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+   Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
    ```
    You will see `🔏 Commit watermarked by quality-gate.`
 4. **The commit is created** with the watermark.
