@@ -36,6 +36,8 @@ quality-gate --install
 
 This installs three hooks: `pre-commit` (runs the checks), `commit-msg` (adds the watermark) and `pre-push`.
 
+On Python projects, `--init` also adds the `pip-audit` dependency audit to **both** `pre-commit` and `pre-push`, so vulnerable libraries are caught when you commit and again right before they leave your machine.
+
 > Already used quality-gate before v1.3.0? Run `--install` again to get the `commit-msg` hook.
 
 To gate **every** repository on your machine that has a `quality.yml`, instead run:
@@ -75,7 +77,7 @@ What happens behind the scenes:
    ```
    feat: add login
 
-   Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+   Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
    ```
    You will see `🔏 Commit watermarked by quality-gate.`
 4. **The commit is created** with the watermark.
@@ -104,9 +106,19 @@ The `commit-msg` hook never blocks a commit; it only warns. Enforcement happens 
 ## 7. Fixes and JSON output
 
 ```bash
-quality-gate --fix pre-commit            # run the fix commands
+quality-gate --fix pre-commit            # run the fix commands (ruff format, pytest…)
+quality-gate --fix pre-push              # runs pip-audit --fix: upgrades vulnerable pins
 quality-gate pre-commit                  # run the checks by hand
+quality-gate pre-push                    # re-runs the dependency audit on demand
 quality-gate --output=json pre-commit    # machine-readable output
+```
+
+`--output=json` embeds each command's raw output as a string in `results[].output`
+(passthrough — for the Python audit that is pip-audit's `--aliases` table).
+For machine-parseable vulnerability data, run pip-audit directly:
+
+```bash
+pip-audit -f json
 ```
 
 ## 8. Enforce it in CI
@@ -153,3 +165,5 @@ quality-gate verify --range origin/main..HEAD --policy strict --output json
 **Can the watermark be forged?** Yes, someone could type it by hand. It stops casual bypasses and leaves an audit trail; the required CI check, which re-runs the gates, is what makes the gate mandatory.
 
 **Squash merge?** It creates a new commit without a watermark. Verify the pull request commits, not the merge commit — the Action does this by default.
+
+**Does the dependency audit need network?** Yes. `pip-audit` queries PyPI/OSV, so an offline commit fails the audit check. Skip the gate for that commit with `QG_SKIP="offline" git commit …`, or remove the pip-audit commands from your `quality.yml` if you prefer to audit only in CI.

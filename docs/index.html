@@ -480,7 +480,7 @@ td.desc{color:var(--text-muted)}
 
 <header class="hdr" id="hdr">
   <div class="wrap nav">
-    <a class="brand" href="#top"><img src="gopher.png" alt="" width="32" height="32" />Go Quality Gate <span class="v">v1.3.0</span></a>
+    <a class="brand" href="#top"><img src="gopher.png" alt="" width="32" height="32" />Go Quality Gate <span class="v">v1.4.0</span></a>
     <nav class="nav-links" id="navlinks">
       <a href="#features">Features</a>
       <a href="#watermark">Watermark</a>
@@ -630,8 +630,8 @@ td.desc{color:var(--text-muted)}
       <article class="card rv accent">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></div>
         <h3>Built-in security</h3>
-        <p>Automatic secret scanning with Gitleaks, wired straight into your commit workflow to prevent leaks.</p>
-        <span class="tagline accent">Gitleaks</span>
+        <p>Automatic secret scanning with Gitleaks plus Python dependency audit with pip-audit, wired straight into your commit and push workflow to prevent leaks.</p>
+        <span class="tagline accent">Gitleaks + pip-audit</span>
       </article>
 
       <article class="card rv">
@@ -723,7 +723,7 @@ git commit -m "feat: add login"
 # 🔏 Commit watermarked by quality-gate.
 
 git log -1 --format='%(trailers)'
-# Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+# Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 
 quality-gate verify --range origin/main..HEAD
 # ✅ 85490328cede attested
@@ -832,6 +832,9 @@ quality-gate ui      # local web dashboard</code></pre>
   - name: "Ruff (Python)"
     check_command: "ruff --version"
     install_command: "pip install ruff"
+  - name: "Pip-Audit (Python Dependency Audit)"
+    check_command: "pip-audit --version"
+    install_command: "pip install pip-audit"
 
 hooks:
   security:
@@ -849,6 +852,19 @@ hooks:
         output_rules:
           show_on: failure
           on_failure_message: "Run 'quality-gate --fix' to format."
+      - name: "Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run 'quality-gate --fix'."
+    pre-push:
+      - name: "Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run 'quality-gate --fix'."
 
   typescript-frontend:
     pre-commit:
@@ -1072,7 +1088,7 @@ quality-gate mcp
         </thead>
         <tbody>
           <tr><td>Go</td><td><span class="pill real">Built-in</span></td><td class="desc"><code>gofmt</code>, <code>goimports</code>, <code>golangci-lint</code>, <code>go vet</code>, <code>gosec</code></td></tr>
-          <tr><td>Python</td><td><span class="pill real">Built-in</span></td><td class="desc"><code>black</code>, <code>ruff</code>, <code>isort</code>, <code>flake8</code>, <code>mypy</code>, <code>bandit</code></td></tr>
+          <tr><td>Python</td><td><span class="pill real">Built-in</span></td><td class="desc"><code>ruff</code>, <code>black</code>, <code>mypy</code>, <code>pytest</code>, <code>pip-audit</code></td></tr>
           <tr><td>Node.js</td><td><span class="pill real">Built-in</span></td><td class="desc"><code>prettier</code>, <code>eslint</code>, <code>npm audit</code>, <code>tsc</code></td></tr>
           <tr><td>Universal</td><td><span class="pill real">Built-in</span></td><td class="desc"><code>gitleaks</code>, <code>shellcheck</code>, <code>hadolint</code>, <code>yamllint</code></td></tr>
           <tr><td>Custom</td><td><span class="pill partial">Config-only</span></td><td class="desc">Any command-line tool that returns a proper exit code — wire it in through <code>quality.yml</code></td></tr>

@@ -227,3 +227,24 @@ func TestInitService_GeneratePreview_DetectionFailure(t *testing.T) {
 		t.Fatal("expected an error when project structure detection fails")
 	}
 }
+
+func TestInitService_GeneratePreview_PythonProjectIncludesPipAudit(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "requirements.txt", "django==4.2\n")
+	writeFile(t, dir, "main.py", "print('hi')\n")
+
+	svc := NewInitServiceWithPath(dir)
+	preview, err := svc.GeneratePreview()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, marker := range []string{
+		"Pip-Audit", "pip-audit -r requirements.txt --aliases",
+		"pip-audit --fix -r requirements.txt", "pre-push:",
+	} {
+		if !strings.Contains(preview, marker) {
+			t.Errorf("expected preview to contain %q, got:\n%s", marker, preview)
+		}
+	}
+}

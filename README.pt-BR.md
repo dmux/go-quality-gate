@@ -25,7 +25,7 @@ Uma ferramenta de controle de qualidade de código construída em Go, distribuí
 - **🔧 Setup Automático**: Instala ferramentas de qualidade automaticamente
 - **🌍 Multi-linguagem**: Suporta múltiplas linguagens em um mesmo repositório
 - **📊 Observabilidade**: Spinners, timing e feedback visual em tempo real
-- **🔒 Segurança Integrada**: Verificação de segredos no fluxo de commit
+- **🔒 Segurança Integrada**: Verificação de segredos + auditoria de vulnerabilidades em dependências Python (pip-audit) no fluxo de commit/push
 - **⚡ Performance Nativa**: Execução instantânea sem interpretadores
 - **🚀 CI/CD Ready**: Output JSON limpo para pipelines de automação
 - **🤖 Servidor MCP**: Suporte ao Model Context Protocol para Agentes de IA (Cursor, Claude, etc.)
@@ -84,6 +84,9 @@ tools:
   - name: "Ruff (Python)"
     check_command: "ruff --version"
     install_command: "pip install ruff"
+  - name: "Pip-Audit (Python Dependency Audit)"
+    check_command: "pip-audit --version"
+    install_command: "pip install pip-audit"
 
 hooks:
   security:
@@ -101,6 +104,19 @@ hooks:
         output_rules:
           show_on: failure
           on_failure_message: "Execute './quality-gate --fix' para corrigir."
+      - name: "🛡️ Auditoria de Dependências (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Dependências vulneráveis encontradas! Execute './quality-gate --fix' ou atualize manualmente."
+    pre-push:
+      - name: "🛡️ Auditoria de Dependências (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Dependências vulneráveis encontradas! Execute './quality-gate --fix' ou atualize manualmente."
 
   typescript-frontend:
     pre-commit:
@@ -108,6 +124,11 @@ hooks:
         command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
         fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
 ```
+
+> A auditoria de dependências com `pip-audit` roda tanto no `pre-commit`
+> quanto no `pre-push` e precisa de acesso à rede (PyPI/OSV). Vai committar
+> offline? Pule o gate com `QG_SKIP="offline" git commit …` ou remova os
+> comandos de audit do seu `quality.yml`.
 
 ## 📘 Como Usar
 
@@ -182,6 +203,9 @@ tools:
   - name: "Ruff (Python Linter/Formatter)"
     check_command: "ruff --version"
     install_command: "pip install ruff"
+  - name: "Pip-Audit (Python Dependency Audit)"
+    check_command: "pip-audit --version"
+    install_command: "pip install pip-audit"
   - name: "Prettier (Code Formatter)"
     check_command: "npx prettier --version"
     install_command: "npm install --global prettier"
@@ -206,6 +230,19 @@ hooks:
         command: "pytest ./backend"
         output_rules:
           show_on: always
+      - name: "🛡️ Auditoria de Dependências (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Dependências vulneráveis encontradas! Execute './quality-gate --fix' ou atualize manualmente."
+    pre-push:
+      - name: "🛡️ Auditoria de Dependências (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Dependências vulneráveis encontradas! Execute './quality-gate --fix' ou atualize manualmente."
 
   typescript-frontend:
     pre-commit:
@@ -233,13 +270,13 @@ hooks:
 ```bash
 # Versão simples
 ./quality-gate --version
-# Output: quality-gate version 1.3.0
+# Output: quality-gate version 1.4.0
 
 # Versão em JSON com detalhes de build
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -254,7 +291,7 @@ Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar 
 ```
 feat: adiciona login
 
-Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 ```
 
 - `--no-verify` pula os dois hooks, então o commit sai **sem** trailer.
