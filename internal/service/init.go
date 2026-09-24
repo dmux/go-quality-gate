@@ -17,7 +17,7 @@ func NewInitService() *InitService {
 	projectPath, _ := os.Getwd() // Default to current directory
 	return &InitService{
 		detector:  NewLanguageDetector(projectPath),
-		generator: NewTemplateGenerator(),
+		generator: NewTemplateGeneratorWithRoot(projectPath),
 	}
 }
 
@@ -25,7 +25,7 @@ func NewInitService() *InitService {
 func NewInitServiceWithPath(projectPath string) *InitService {
 	return &InitService{
 		detector:  NewLanguageDetector(projectPath),
-		generator: NewTemplateGenerator(),
+		generator: NewTemplateGeneratorWithRoot(projectPath),
 	}
 }
 

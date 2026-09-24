@@ -426,7 +426,7 @@ func (v *ConfigValidator) validateToolReferences(result *ValidationResult) {
 func (v *ConfigValidator) checkCommandToolReferences(commands []Hook, availableTools map[string]bool, fieldPrefix string, result *ValidationResult) {
 	commonTools := []string{
 		"prettier", "eslint", "ruff", "black", "pytest", "gofmt", "golangci-lint",
-		"rustfmt", "cargo", "php-cs-fixer", "phpstan", "gitleaks",
+		"rustfmt", "cargo", "php-cs-fixer", "phpstan", "gitleaks", "pip-audit",
 	}
 
 	for i, cmd := range commands {

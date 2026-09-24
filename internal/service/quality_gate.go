@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
@@ -51,15 +52,21 @@ func (s *QualityGateService) Run(cfg *config.Config, hookType string, parallel b
 // Fix executes the fix commands for all fixable hooks.
 
 func (s *QualityGateService) Fix(cfg *config.Config, hookType string) error {
-	// 2. Run fix commands for the given hook type.
 	hooksToFix := s.getHooksToRun(cfg.Hooks, hookType)
+	var fixErrors []string
 	for _, hook := range hooksToFix {
-		if hook.FixCommand != "" {
-			_, err := s.hookRunner.RunFixCommand(hook)
-			if err != nil {
-				return fmt.Errorf("failed to run fix command for hook %s: %w", hook.Name, err)
-			}
+		if hook.FixCommand == "" {
+			continue
 		}
+		if _, err := s.hookRunner.RunFixCommand(hook); err != nil {
+			// A non-zero exit from a fix command (e.g. `ruff check --fix`
+			// still reporting unfixable errors) must not skip the
+			// remaining fixes — collect and keep going.
+			fixErrors = append(fixErrors, fmt.Sprintf("fix command for hook %s failed: %s", hook.Name, err))
+		}
+	}
+	if len(fixErrors) > 0 {
+		return fmt.Errorf("one or more fix commands failed:\n%s", strings.Join(fixErrors, "\n"))
 	}
 
 	return nil

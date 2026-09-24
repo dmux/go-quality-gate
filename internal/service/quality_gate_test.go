@@ -206,6 +206,44 @@ func TestQualityGateService_Fix_CommandFails(t *testing.T) {
 	}
 }
 
+// A failing fix command (e.g. `ruff check --fix` exiting non-zero while
+// unfixable errors remain) must not skip the remaining fix commands.
+func TestQualityGateService_Fix_ContinuesAfterFailure(t *testing.T) {
+	cfg := &config.Config{
+		Hooks: config.Hooks{
+			"backend": {
+				"pre-commit": []config.Hook{
+					{Name: "Format", Command: "ruff format --check", FixCommand: "ruff format"},
+					{Name: "Lint", Command: "ruff check", FixCommand: "ruff check --fix"},
+					{Name: "Audit", Command: "pip-audit .", FixCommand: "pip-audit --fix ."},
+				},
+			},
+		},
+	}
+	hookRunner := &MockHookRunner{
+		FixResults: map[string]struct {
+			Output string
+			Err    error
+		}{
+			"Lint": {Err: errors.New("exit status 1")},
+		},
+	}
+	service := NewQualityGateService(&MockToolManager{}, hookRunner)
+
+	err := service.Fix(cfg, "pre-commit")
+
+	if err == nil {
+		t.Fatal("expected an error when a fix command fails")
+	}
+	if len(hookRunner.FixedHooks) != 3 {
+		t.Fatalf("expected all 3 fix commands to run despite the failure, got %d: %+v",
+			len(hookRunner.FixedHooks), hookRunner.FixedHooks)
+	}
+	if hookRunner.FixedHooks[2].Name != "Audit" {
+		t.Errorf("expected the last fix command ('Audit') to run, got %q", hookRunner.FixedHooks[2].Name)
+	}
+}
+
 func TestQualityGateService_Fix_NoFixCommandsConfigured(t *testing.T) {
 	toolManager := &MockToolManager{}
 	hookRunner := &MockHookRunner{}

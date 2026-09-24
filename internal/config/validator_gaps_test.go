@@ -138,6 +138,36 @@ func TestCheckCommandToolReferences_MissingToolConfig(t *testing.T) {
 	}
 }
 
+func TestCheckCommandToolReferences_PipAuditMissingToolConfig(t *testing.T) {
+	validator := NewConfigValidator(&Config{})
+	result := &ValidationResult{Valid: true}
+
+	commands := []Hook{{Name: "Audit", Command: "pip-audit -r requirements.txt --aliases"}}
+	validator.checkCommandToolReferences(commands, map[string]bool{}, "hooks.python-backend.pre-push", result)
+
+	found := false
+	for _, e := range result.Errors {
+		if e.Issue == "Command uses 'pip-audit' but no tool configuration found" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a warning for an unconfigured pip-audit tool, got %+v", result.Errors)
+	}
+}
+
+func TestCheckCommandToolReferences_PipAuditConfiguredIsSilent(t *testing.T) {
+	validator := NewConfigValidator(&Config{})
+	result := &ValidationResult{Valid: true}
+
+	commands := []Hook{{Name: "Audit", Command: "pip-audit --aliases"}}
+	validator.checkCommandToolReferences(commands, map[string]bool{"pip-audit": true}, "hooks.python-backend.pre-push", result)
+
+	if len(result.Errors) != 0 {
+		t.Errorf("expected no warning when pip-audit is configured, got %+v", result.Errors)
+	}
+}
+
 func TestValidateEssentialHooks_SecurityHookPresent(t *testing.T) {
 	cfg := &Config{Hooks: Hooks{"Security": {}}}
 	validator := NewConfigValidator(cfg)

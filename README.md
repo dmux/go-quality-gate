@@ -26,7 +26,7 @@ A code quality control tool built in Go, distributed as a single binary with no 
 - **🔧 Automatic Setup**: Installs quality tools automatically
 - **🌍 Multi-language**: Supports multiple languages in the same repository
 - **📊 Observability**: Spinners, timing, and real-time visual feedback
-- **🔒 Built-in Security**: Secret scanning in commit workflow
+- **🔒 Built-in Security**: Secret scanning plus Python dependency vulnerability audit (pip-audit) in commit/push workflow
 - **⚡ Native Performance**: Instant execution without interpreters
 - **🚀 CI/CD Ready**: Clean JSON output for automation pipelines
 - **🤖 MCP Server**: Model Context Protocol support for AI coding agents (Claude, Cursor, etc.)
@@ -132,6 +132,9 @@ tools:
   - name: "Ruff (Python)"
     check_command: "ruff --version"
     install_command: "pip install ruff"
+  - name: "Pip-Audit (Python Dependency Audit)"
+    check_command: "pip-audit --version"
+    install_command: "pip install pip-audit"
 
 hooks:
   security:
@@ -149,6 +152,19 @@ hooks:
         output_rules:
           show_on: failure
           on_failure_message: "Run './quality-gate --fix' to format."
+      - name: "🛡️ Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run './quality-gate --fix' or upgrade manually."
+    pre-push:
+      - name: "🛡️ Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run './quality-gate --fix' or upgrade manually."
 
   typescript-frontend:
     pre-commit:
@@ -156,6 +172,11 @@ hooks:
         command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
         fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
 ```
+
+> The `pip-audit` dependency audit runs on both `pre-commit` and `pre-push` and
+> needs network access (PyPI/OSV). Committing offline? Skip the gate with
+> `QG_SKIP="offline" git commit …` or drop the audit commands from your
+> `quality.yml`.
 
 ## 📘 How to Use
 
@@ -229,6 +250,9 @@ tools:
   - name: "Ruff (Python Linter/Formatter)"
     check_command: "ruff --version"
     install_command: "pip install ruff"
+  - name: "Pip-Audit (Python Dependency Audit)"
+    check_command: "pip-audit --version"
+    install_command: "pip install pip-audit"
   - name: "Prettier (Code Formatter)"
     check_command: "npx prettier --version"
     install_command: "npm install --global prettier"
@@ -253,6 +277,19 @@ hooks:
         command: "pytest ./backend"
         output_rules:
           show_on: always
+      - name: "🛡️ Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run './quality-gate --fix' or upgrade manually."
+    pre-push:
+      - name: "🛡️ Dependency Audit (pip-audit)"
+        command: "pip-audit -r requirements.txt --aliases"
+        fix_command: "pip-audit --fix -r requirements.txt"
+        output_rules:
+          show_on: failure
+          on_failure_message: "Vulnerable dependencies found! Run './quality-gate --fix' or upgrade manually."
 
   typescript-frontend:
     pre-commit:
