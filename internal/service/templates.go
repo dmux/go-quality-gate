@@ -2,6 +2,8 @@ package service
 
 import (
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -34,14 +36,29 @@ type CommandTemplate struct {
 	OutputRules      map[string]string `yaml:"output_rules,omitempty"`
 	WorkingDirectory string            `yaml:"working_directory,omitempty"`
 	RequiredFiles    []string          `yaml:"required_files,omitempty"`
+	// HookTypes lists the hook sections this command is emitted under
+	// (e.g. pre-commit, pre-push). Empty means pre-commit only. This field
+	// drives template grouping and is never written to the YAML itself.
+	HookTypes []string `yaml:"-"`
 }
 
 // TemplateGenerator generates quality.yml content based on detected project structure
-type TemplateGenerator struct{}
+type TemplateGenerator struct {
+	// projectPath is the absolute root the detector walked. It is used to
+	// relativize file paths when building audit commands. Empty means paths
+	// are already repo-relative (unit-test fixtures).
+	projectPath string
+}
 
 // NewTemplateGenerator creates a new template generator
 func NewTemplateGenerator() *TemplateGenerator {
 	return &TemplateGenerator{}
+}
+
+// NewTemplateGeneratorWithRoot creates a generator that relativizes paths
+// detected under projectPath (absolute) back to the repository root.
+func NewTemplateGeneratorWithRoot(projectPath string) *TemplateGenerator {
+	return &TemplateGenerator{projectPath: projectPath}
 }
 
 // GenerateTemplate creates a quality.yml template based on project structure
@@ -72,7 +89,7 @@ func (g *TemplateGenerator) generateTools(structure *ProjectStructure) []ToolTem
 	tools = append(tools, ToolTemplate{
 		Name:           "Gitleaks",
 		CheckCommand:   "gitleaks version",
-		InstallCommand: "go install github.com/gitleaks/gitleaks/v8@latest",
+		InstallCommand: "go install github.com/zricethezav/gitleaks/v8@latest",
 	})
 	seen["gitleaks"] = true
 
@@ -104,27 +121,26 @@ func (g *TemplateGenerator) generateTools(structure *ProjectStructure) []ToolTem
 // generateHooks creates hook configurations based on detected languages
 func (g *TemplateGenerator) generateHooks(structure *ProjectStructure) []HookTemplate {
 	var hooks []HookTemplate
+	seen := make(map[string]bool)
+
+	appendHook := func(hook HookTemplate) {
+		if len(hook.Commands) > 0 && !seen[hook.Name] {
+			hooks = append(hooks, hook)
+			seen[hook.Name] = true
+		}
+	}
 
 	// Security hooks (always included)
-	securityHook := g.generateSecurityHooks()
-	if len(securityHook.Commands) > 0 {
-		hooks = append(hooks, securityHook)
-	}
+	appendHook(g.generateSecurityHooks())
 
 	// Language-specific hooks
 	for _, lang := range structure.Languages {
-		langHook := g.generateLanguageHooks(lang, structure)
-		if len(langHook.Commands) > 0 {
-			hooks = append(hooks, langHook)
-		}
+		appendHook(g.generateLanguageHooks(lang, structure))
 	}
 
 	// Framework-specific hooks
 	for _, framework := range structure.Frameworks {
-		frameworkHook := g.generateFrameworkHooks(framework, structure)
-		if len(frameworkHook.Commands) > 0 {
-			hooks = append(hooks, frameworkHook)
-		}
+		appendHook(g.generateFrameworkHooks(framework, structure))
 	}
 
 	return hooks
@@ -162,6 +178,11 @@ func (g *TemplateGenerator) getLanguageTools(lang Language) []ToolTemplate {
 				Name:           "MyPy (Type Checker)",
 				CheckCommand:   "mypy --version",
 				InstallCommand: "pip install mypy",
+			},
+			{
+				Name:           "Pip-Audit (Python Dependency Audit)",
+				CheckCommand:   "pip-audit --version",
+				InstallCommand: "pip install pip-audit",
 			},
 		}
 	case LanguageNode, LanguageTypeScript:
@@ -349,6 +370,15 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 		break
 	}
 
+	auditSource := g.detectPythonAuditSource(structure)
+	auditCommand := "pip-audit"
+	auditFix := "pip-audit --fix"
+	if auditSource != "" {
+		auditCommand += " " + auditSource
+		auditFix += " " + auditSource
+	}
+	auditCommand += " --aliases"
+
 	commands = append(commands,
 		CommandTemplate{
 			Name:       "🎨 Format Check (Ruff)",
@@ -360,10 +390,12 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 			},
 		},
 		CommandTemplate{
-			Name:    "🔍 Lint (Ruff)",
-			Command: fmt.Sprintf("ruff check %s", targetDir),
+			Name:       "🔍 Lint (Ruff)",
+			Command:    fmt.Sprintf("ruff check %s", targetDir),
+			FixCommand: fmt.Sprintf("ruff check %s --fix", targetDir),
 			OutputRules: map[string]string{
-				"show_on": "failure",
+				"show_on":            "failure",
+				"on_failure_message": "Lint issues detected. Run './quality-gate --fix' to apply autofixes.",
 			},
 		},
 		CommandTemplate{
@@ -371,6 +403,16 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 			Command: "pytest",
 			OutputRules: map[string]string{
 				"show_on": "always",
+			},
+		},
+		CommandTemplate{
+			Name:       "🛡️ Dependency Audit (pip-audit)",
+			Command:    auditCommand,
+			FixCommand: auditFix,
+			HookTypes:  []string{"pre-commit", "pre-push"},
+			OutputRules: map[string]string{
+				"show_on":            "failure",
+				"on_failure_message": "Vulnerable dependencies found! Run './quality-gate --fix' or upgrade manually.",
 			},
 		},
 	)
@@ -575,31 +617,99 @@ func (g *TemplateGenerator) formatHooksSection(hooks []HookTemplate) string {
 		if hook.Description != "" {
 			lines = append(lines, fmt.Sprintf("    # %s", hook.Description))
 		}
-		lines = append(lines, "    pre-commit:")
 
+		// Group commands by hook type, preserving first-appearance order of
+		// both types and commands within each type.
+		var hookTypes []string
+		byType := make(map[string][]CommandTemplate)
 		for _, cmd := range hook.Commands {
-			lines = append(lines, fmt.Sprintf("      - name: \"%s\"", cmd.Name))
-			lines = append(lines, fmt.Sprintf("        command: \"%s\"", cmd.Command))
-
-			if cmd.FixCommand != "" {
-				lines = append(lines, fmt.Sprintf("        fix_command: \"%s\"", cmd.FixCommand))
-			}
-
-			if len(cmd.OutputRules) > 0 {
-				lines = append(lines, "        output_rules:")
-				for key, value := range cmd.OutputRules {
-					lines = append(lines, fmt.Sprintf("          %s: \"%s\"", key, value))
+			for _, hookType := range commandHookTypes(cmd) {
+				if _, seen := byType[hookType]; !seen {
+					hookTypes = append(hookTypes, hookType)
 				}
+				byType[hookType] = append(byType[hookType], cmd)
 			}
+		}
 
-			lines = append(lines, "")
+		for _, hookType := range hookTypes {
+			lines = append(lines, fmt.Sprintf("    %s:", hookType))
+
+			for _, cmd := range byType[hookType] {
+				lines = append(lines, fmt.Sprintf("      - name: \"%s\"", cmd.Name))
+				lines = append(lines, fmt.Sprintf("        command: \"%s\"", cmd.Command))
+
+				if cmd.FixCommand != "" {
+					lines = append(lines, fmt.Sprintf("        fix_command: \"%s\"", cmd.FixCommand))
+				}
+
+				if len(cmd.OutputRules) > 0 {
+					lines = append(lines, "        output_rules:")
+					for key, value := range cmd.OutputRules {
+						lines = append(lines, fmt.Sprintf("          %s: \"%s\"", key, value))
+					}
+				}
+
+				lines = append(lines, "")
+			}
 		}
 	}
 
 	return strings.Join(lines, "\n")
 }
 
+// commandHookTypes returns the hook sections a command is emitted under,
+// defaulting to pre-commit only when no explicit types are set.
+func commandHookTypes(cmd CommandTemplate) []string {
+	if len(cmd.HookTypes) == 0 {
+		return []string{"pre-commit"}
+	}
+	return cmd.HookTypes
+}
+
 // Helper functions
+
+// detectPythonAuditSource resolves the pip-audit source argument from the
+// detected Python files: a requirements.txt wins (-r <relpath>), then a
+// pyproject.toml (audit its directory), then fall back to auditing the
+// current environment (empty source).
+func (g *TemplateGenerator) detectPythonAuditSource(structure *ProjectStructure) string {
+	var requirements, pyproject []string
+	for _, file := range structure.Structure["python"] {
+		switch filepath.Base(file) {
+		case "requirements.txt":
+			requirements = append(requirements, file)
+		case "pyproject.toml":
+			pyproject = append(pyproject, file)
+		}
+	}
+
+	if len(requirements) > 0 {
+		sort.Strings(requirements)
+		return "-r " + g.relPath(requirements[0])
+	}
+	if len(pyproject) > 0 {
+		sort.Strings(pyproject)
+		dir := filepath.Dir(pyproject[0])
+		if dir == "" || dir == "." {
+			return "."
+		}
+		return g.relPath(dir)
+	}
+	return ""
+}
+
+// relPath converts a detected file path to a repository-relative path when
+// it is absolute under the generator's project root; already-relative paths
+// pass through unchanged.
+func (g *TemplateGenerator) relPath(path string) string {
+	if g.projectPath != "" && filepath.IsAbs(path) {
+		if rel, err := filepath.Rel(g.projectPath, path); err == nil {
+			return rel
+		}
+	}
+	return filepath.ToSlash(path)
+}
+
 func (g *TemplateGenerator) hasLanguage(target Language, languages []Language) bool {
 	for _, lang := range languages {
 		if lang == target {
