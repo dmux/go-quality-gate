@@ -248,3 +248,99 @@ func TestInitService_GeneratePreview_PythonProjectIncludesPipAudit(t *testing.T)
 		}
 	}
 }
+
+func withInteractive(t *testing.T, interactive bool) {
+	t.Helper()
+	orig := isInteractive
+	isInteractive = func() bool { return interactive }
+	t.Cleanup(func() { isInteractive = orig })
+}
+
+func TestInitService_InitWithOptions_PromptsForLanguageWhenNoneDetected(t *testing.T) {
+	dir := t.TempDir()
+	withInteractive(t, true)
+
+	svc := NewInitServiceWithPath(dir)
+	outputPath := filepath.Join(dir, "quality.yml")
+
+	captureStdout(t, func() {
+		if err := svc.InitWithOptions(InitOptions{OutputPath: outputPath, Stdin: strings.NewReader("python\n")}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "Ruff") {
+		t.Errorf("expected generated content to include Python tooling from the prompted answer, got:\n%s", content)
+	}
+}
+
+func TestInitService_InitWithOptions_NonInteractiveSkipsPrompt(t *testing.T) {
+	dir := t.TempDir()
+	withInteractive(t, false)
+
+	svc := NewInitServiceWithPath(dir)
+	outputPath := filepath.Join(dir, "quality.yml")
+
+	output := captureStdout(t, func() {
+		if err := svc.InitWithOptions(InitOptions{OutputPath: outputPath}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if strings.Contains(output, "No language detected automatically") {
+		t.Errorf("expected no prompt in non-interactive mode, got:\n%s", output)
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("expected quality.yml to be created: %v", err)
+	}
+}
+
+func TestInitService_InitWithOptions_UnrecognizedAnswerFallsBackSilently(t *testing.T) {
+	dir := t.TempDir()
+	withInteractive(t, true)
+
+	svc := NewInitServiceWithPath(dir)
+	outputPath := filepath.Join(dir, "quality.yml")
+
+	captureStdout(t, func() {
+		if err := svc.InitWithOptions(InitOptions{OutputPath: outputPath, Stdin: strings.NewReader("cobol\n")}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("expected quality.yml to still be created: %v", err)
+	}
+}
+
+func TestPromptForLanguage(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		wantOK   bool
+		wantLang Language
+	}{
+		{"recognized token", "python\n", true, LanguagePython},
+		{"case insensitive with whitespace", "  PY  \n", true, LanguagePython},
+		{"unrecognized token", "cobol\n", false, ""},
+		{"empty stdin", "", false, ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			captureStdout(t, func() {
+				lang, ok := promptForLanguage(strings.NewReader(tc.input))
+				if ok != tc.wantOK {
+					t.Errorf("ok = %v, want %v", ok, tc.wantOK)
+				}
+				if lang != tc.wantLang {
+					t.Errorf("lang = %q, want %q", lang, tc.wantLang)
+				}
+			})
+		})
+	}
+}
