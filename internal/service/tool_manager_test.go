@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
 )
 
@@ -96,7 +97,7 @@ func TestToolManagerService_EnsureToolsInstalled(t *testing.T) {
 		Err    error
 	}{"installed", nil}
 
-	err := service.EnsureToolsInstalled(tools)
+	err := service.EnsureToolsInstalled(tools, config.ToolsPolicyInstall)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestToolManagerService_EnsureToolsInstalled(t *testing.T) {
 		Err    error
 	}{"installed", nil}
 
-	err = service.EnsureToolsInstalled(tools)
+	err = service.EnsureToolsInstalled(tools, config.ToolsPolicyInstall)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
@@ -130,8 +131,30 @@ func TestToolManagerService_EnsureToolsInstalled(t *testing.T) {
 		Err    error
 	}{"", errors.New("installation failed")}
 
-	err = service.EnsureToolsInstalled(tools)
+	err = service.EnsureToolsInstalled(tools, config.ToolsPolicyInstall)
 	if err == nil {
 		t.Error("Expected an error, but got none")
+	}
+}
+
+func TestToolManagerService_RecommendPolicySkipsInstall(t *testing.T) {
+	runner := &countingShellRunner{
+		commands: map[string]error{
+			"check_tool_1": errors.New("not installed"),
+		},
+		calls: make(map[string]int),
+	}
+	service := NewToolManagerService(runner, &MockLogger{})
+
+	tools := []domain.Tool{
+		{Name: "Tool 1", CheckCommand: "check_tool_1", InstallCommand: "install_tool_1"},
+	}
+
+	if err := service.EnsureToolsInstalled(tools, config.ToolsPolicyRecommend); err != nil {
+		t.Fatalf("expected no error in recommend mode, got %v", err)
+	}
+
+	if runner.calls["install_tool_1"] != 0 {
+		t.Errorf("expected install_tool_1 to never run in recommend mode, ran %d times", runner.calls["install_tool_1"])
 	}
 }

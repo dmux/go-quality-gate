@@ -4,15 +4,17 @@ import "github.com/dmux/go-quality-gate/internal/domain"
 
 // MockToolManager is a mock implementation of the repository.ToolManager interface.
 type MockToolManager struct {
-	Err           error
-	EnsureCalled  bool
-	ReceivedTools []domain.Tool
+	Err            error
+	EnsureCalled   bool
+	ReceivedTools  []domain.Tool
+	ReceivedPolicy string
 }
 
 // EnsureToolsInstalled implements the repository.ToolManager interface.
-func (m *MockToolManager) EnsureToolsInstalled(tools []domain.Tool) error {
+func (m *MockToolManager) EnsureToolsInstalled(tools []domain.Tool, policy string) error {
 	m.EnsureCalled = true
 	m.ReceivedTools = tools
+	m.ReceivedPolicy = policy
 	return m.Err
 }
 
