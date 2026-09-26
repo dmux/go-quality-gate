@@ -10,7 +10,10 @@ type ShellRunner interface {
 
 // ToolManager defines the interface for tool management.
 type ToolManager interface {
-	EnsureToolsInstalled(tools []domain.Tool) error
+	// EnsureToolsInstalled checks every tool's presence. When policy is
+	// "recommend" it only reports missing tools without installing them;
+	// any other value (including "") preserves the default install behavior.
+	EnsureToolsInstalled(tools []domain.Tool, policy string) error
 }
 
 // HookRunner defines the interface for hook execution.

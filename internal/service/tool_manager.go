@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
 	"github.com/dmux/go-quality-gate/internal/infra/logger"
 	"github.com/dmux/go-quality-gate/internal/repository"
@@ -32,9 +33,12 @@ func NewCachingToolManagerService(shellRunner repository.ShellRunner, logger log
 	return &ToolManagerService{shellRunner: shellRunner, logger: logger, state: state}
 }
 
-// EnsureToolsInstalled checks if all tools are installed and installs them if they are not.
+// EnsureToolsInstalled checks if all tools are installed. When policy is
+// config.ToolsPolicyRecommend, a missing tool is only reported (with its
+// install command) rather than installed automatically; any other value
+// (including "") keeps the default auto-install behavior.
 
-func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool) error {
+func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy string) error {
 	toolsHash := hashTools(tools)
 
 	if s.state != nil {
@@ -54,6 +58,11 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool) error {
 		s.logger.StopSpinner()
 
 		if err != nil {
+			if policy == config.ToolsPolicyRecommend {
+				s.logger.Print("⚠️  %s is not installed. Recommended install command: %s\n", tool.Name, tool.InstallCommand)
+				continue
+			}
+
 			s.logger.StartSpinner(fmt.Sprintf("Installing %s...", tool.Name))
 
 			installStartTime := time.Now()

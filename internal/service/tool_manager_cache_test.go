@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
 )
 
@@ -49,10 +50,10 @@ func TestToolManagerService_CachesSuccessfulValidation(t *testing.T) {
 		InstallCommand: "install tool",
 	}}
 
-	if err := manager.EnsureToolsInstalled(tools); err != nil {
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); err != nil {
 		t.Fatalf("first validation failed: %v", err)
 	}
-	if err := manager.EnsureToolsInstalled(tools); err != nil {
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); err != nil {
 		t.Fatalf("cached validation failed: %v", err)
 	}
 
@@ -77,10 +78,10 @@ func TestToolManagerService_InvalidatesCacheWhenToolsChange(t *testing.T) {
 	original := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
 	changed := append(original, domain.Tool{Name: "New Tool", CheckCommand: "new-tool --version", InstallCommand: "install new-tool"})
 
-	if err := manager.EnsureToolsInstalled(original); err != nil {
+	if err := manager.EnsureToolsInstalled(original, config.ToolsPolicyInstall); err != nil {
 		t.Fatalf("initial validation failed: %v", err)
 	}
-	if err := manager.EnsureToolsInstalled(changed); err != nil {
+	if err := manager.EnsureToolsInstalled(changed, config.ToolsPolicyInstall); err != nil {
 		t.Fatalf("validation after configuration change failed: %v", err)
 	}
 
@@ -105,7 +106,7 @@ func TestToolManagerService_DoesNotCacheFailedInstallation(t *testing.T) {
 	manager := NewCachingToolManagerService(runner, &MockLogger{}, state)
 	tools := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
 
-	if err := manager.EnsureToolsInstalled(tools); !errors.Is(err, installErr) {
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); !errors.Is(err, installErr) {
 		t.Fatalf("got error %v, want %v", err, installErr)
 	}
 	if state.saveCalls != 0 {
@@ -125,7 +126,7 @@ func TestToolManagerService_CacheErrorsDoNotBreakValidation(t *testing.T) {
 	manager := NewCachingToolManagerService(runner, &MockLogger{}, state)
 	tools := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
 
-	if err := manager.EnsureToolsInstalled(tools); err != nil {
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); err != nil {
 		t.Fatalf("cache errors broke validation: %v", err)
 	}
 	if got := runner.calls["tool --version"]; got != 1 {
