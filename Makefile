@@ -41,6 +41,12 @@ test-coverage:
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
+# Run the multi-distro E2E suite (requires Docker)
+.PHONY: test-e2e
+test-e2e:
+	@echo "Running E2E tests (requires Docker)..."
+	go test -tags=e2e -v ./test/e2e/...
+
 # Clean build artifacts
 .PHONY: clean
 clean:
@@ -101,6 +107,7 @@ help:
 	@echo "  dev            Build the binary for development"
 	@echo "  test           Run all tests"
 	@echo "  test-coverage  Run tests with coverage report"
+	@echo "  test-e2e       Run the multi-distro E2E suite (requires Docker)"
 	@echo "  clean          Remove build artifacts"
 	@echo "  install        Install binary to GOPATH/bin"
 	@echo "  version        Show version information"
