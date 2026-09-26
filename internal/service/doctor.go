@@ -3,7 +3,9 @@ package service
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/repository"
@@ -41,7 +43,71 @@ func (s *DoctorService) Run() []DoctorCheck {
 		}
 	}
 
-	return append(checks, s.checkConfig())
+	cfg, err := config.LoadConfig(s.configPath)
+	if err != nil {
+		return append(checks, DoctorCheck{Name: s.configPath, Detail: err.Error()})
+	}
+
+	result := config.NewConfigValidator(cfg).Validate()
+	if !result.Valid {
+		checks = append(checks, DoctorCheck{Name: s.configPath, Detail: fmt.Sprintf("invalid:\n%s", result.GetFormattedErrors())})
+		return checks
+	}
+	checks = append(checks, DoctorCheck{Name: s.configPath, OK: true})
+
+	for _, tool := range cfg.Tools {
+		checks = append(checks, checkToolAvailability(tool))
+	}
+
+	// filepath.Abs matters here: LanguageDetector's walk treats a root path
+	// of "." (what filepath.Dir("quality.yml") returns) as dot-prefixed and
+	// skips it entirely, so relative configPaths must be resolved first.
+	projectDir, err := filepath.Abs(filepath.Dir(s.configPath))
+	if err != nil {
+		projectDir = filepath.Dir(s.configPath)
+	}
+	structure, err := NewLanguageDetector(projectDir).DetectProjectStructure()
+	if err != nil {
+		checks = append(checks, DoctorCheck{Name: "project runtimes", Detail: err.Error()})
+		return checks
+	}
+	for _, rc := range DetectRuntimes(structure) {
+		checks = append(checks, checkRuntimeAvailability(rc))
+	}
+
+	return checks
+}
+
+// checkToolAvailability reports whether a configured tool's binary is on
+// PATH. Commands piped/chained/qualified with a path are skipped, the same
+// exclusion config.ConfigValidator.validateToolAvailability applies, since
+// running a fragment of such a command wouldn't be a meaningful check.
+func checkToolAvailability(tool config.Tool) DoctorCheck {
+	name := tool.Name + " tool"
+
+	parts := strings.Fields(tool.CheckCommand)
+	if len(parts) == 0 {
+		return DoctorCheck{Name: name, Detail: "no check_command configured"}
+	}
+	cmdName := parts[0]
+	if strings.ContainsAny(cmdName, "/|&") {
+		return DoctorCheck{Name: name, OK: true, Detail: "skipped (complex check_command)"}
+	}
+
+	if _, err := exec.LookPath(cmdName); err != nil {
+		return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", cmdName, tool.InstallCommand)}
+	}
+	return DoctorCheck{Name: name, OK: true, Detail: cmdName}
+}
+
+// checkRuntimeAvailability reports whether a detected language's base
+// runtime is on PATH, with an OS-specific install hint when it's not.
+func checkRuntimeAvailability(rc RuntimeCheck) DoctorCheck {
+	name := string(rc.Language) + " runtime"
+	if !rc.Installed {
+		return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", rc.Binary, rc.InstallHint)}
+	}
+	return DoctorCheck{Name: name, OK: true, Detail: rc.Binary}
 }
 
 func checkHook(path, hook string) DoctorCheck {
@@ -67,16 +133,4 @@ func checkHook(path, hook string) DoctorCheck {
 		return DoctorCheck{Name: name, Detail: fmt.Sprintf("runs %q, which is missing or not executable; run `quality-gate --install`", binary)}
 	}
 	return DoctorCheck{Name: name, OK: true, Detail: path}
-}
-
-func (s *DoctorService) checkConfig() DoctorCheck {
-	cfg, err := config.LoadConfig(s.configPath)
-	if err != nil {
-		return DoctorCheck{Name: s.configPath, Detail: err.Error()}
-	}
-	result := config.NewConfigValidator(cfg).Validate()
-	if !result.Valid {
-		return DoctorCheck{Name: s.configPath, Detail: fmt.Sprintf("invalid:\n%s", result.GetFormattedErrors())}
-	}
-	return DoctorCheck{Name: s.configPath, OK: true}
 }
