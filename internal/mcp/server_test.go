@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +34,8 @@ func newTestServer(hooks []config.Hook) *MCPServer {
 		},
 	}
 
-	return NewMCPServer(qualityGate, cfg, "test")
+	doctorService := service.NewDoctorService(gitRepo, "quality.yml")
+	return NewMCPServer(qualityGate, cfg, doctorService, "test")
 }
 
 func TestMCPServer_RunQualityChecks(t *testing.T) {
@@ -60,7 +62,8 @@ func TestMCPServer_RunQualityChecks(t *testing.T) {
 		},
 	}
 
-	server := NewMCPServer(qualityGate, cfg, "test")
+	doctorService := service.NewDoctorService(gitRepo, "quality.yml")
+	server := NewMCPServer(qualityGate, cfg, doctorService, "test")
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -114,7 +117,8 @@ func TestMCPServer_RunAutoFix(t *testing.T) {
 		},
 	}
 
-	server := NewMCPServer(qualityGate, cfg, "test")
+	doctorService := service.NewDoctorService(gitRepo, "quality.yml")
+	server := NewMCPServer(qualityGate, cfg, doctorService, "test")
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -255,6 +259,46 @@ func TestMCPServer_RunAutoFix_CommandFails(t *testing.T) {
 	content := res.Content[0].(mcp.TextContent).Text
 	if !strings.Contains(content, "Auto-fix encountered an error") {
 		t.Errorf("expected the fix error to be reported, got %s", content)
+	}
+}
+
+func TestMCPServer_CheckEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	qualityYML := filepath.Join(dir, "quality.yml")
+	if err := os.WriteFile(qualityYML, []byte("tools: []\nhooks: {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	shellRunner := &shell.RealShellRunner{}
+	consoleLogger := logger.NewConsoleLogger(true)
+	gitRepo := &git.RealGitRepository{}
+	toolManager := service.NewCachingToolManagerService(shellRunner, consoleLogger, gitRepo)
+	hookRunner := service.NewHookRunnerService(shellRunner, consoleLogger)
+	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
+	cfg := &config.Config{Tools: []config.Tool{}, Hooks: config.Hooks{}}
+	doctorService := service.NewDoctorService(gitRepo, "quality.yml")
+
+	server := NewMCPServer(qualityGate, cfg, doctorService, "test")
+
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Name: "check_environment", Arguments: map[string]interface{}{}},
+	}
+
+	res, err := server.handleCheckEnvironment(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("expected no tool error, got: %v", res)
+	}
+
+	content := res.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(content, "quality.yml") {
+		t.Errorf("expected the config check to be reported, got %s", content)
+	}
+	if !strings.Contains(content, "Environment has issues.") {
+		t.Errorf("expected an issues summary since hooks aren't installed, got %s", content)
 	}
 }
 
