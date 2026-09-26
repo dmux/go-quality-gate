@@ -448,6 +448,20 @@ go test ./...
 ./quality-gate --install
 ```
 
+### Testes
+
+- `go test ./...` — testes unitários rápidos, sem dependências externas,
+  executados a cada commit.
+- `make test-e2e` — suíte end-to-end multi-distro (`test/e2e`, build tag
+  `e2e`) que sobe containers reais de alpine/debian/fedora via
+  [testcontainers-go](https://golang.testcontainers.org/) e verifica se o
+  `doctor` recomenda o comando de instalação correto para cada gerenciador
+  de pacotes (`apk`/`apt-get`/`dnf`). **Requer um daemon Docker em execução.**
+- O CI também executa `quality-gate --init`/`doctor`/`pre-commit`
+  nativamente em `ubuntu-latest`, `macos-latest` e `windows-latest` (veja
+  `.github/workflows/ci.yml`), já que o binário é compilado para todas essas
+  plataformas mas antes só era executado de fato no Linux.
+
 ### Arquitetura
 
 ```text
