@@ -181,6 +181,49 @@ func TestConfigValidator_Validate(t *testing.T) {
 	})
 }
 
+func TestConfigValidator_ValidateSettings(t *testing.T) {
+	t.Run("EmptyToolsPolicyIsValid", func(t *testing.T) {
+		config := &Config{}
+		validator := NewConfigValidator(config)
+		result := &ValidationResult{Valid: true, Errors: []ValidationError{}}
+		validator.validateSettings(result)
+
+		if len(result.Errors) > 0 {
+			t.Errorf("Expected no errors for empty tools_policy, but got: %v", result.Errors)
+		}
+	})
+
+	t.Run("ValidToolsPolicyValues", func(t *testing.T) {
+		for _, value := range []string{ToolsPolicyInstall, ToolsPolicyRecommend} {
+			config := &Config{Settings: Settings{ToolsPolicy: value}}
+			validator := NewConfigValidator(config)
+			result := &ValidationResult{Valid: true, Errors: []ValidationError{}}
+			validator.validateSettings(result)
+
+			if len(result.Errors) > 0 {
+				t.Errorf("Expected no errors for tools_policy %q, but got: %v", value, result.Errors)
+			}
+		}
+	})
+
+	t.Run("InvalidToolsPolicyValue", func(t *testing.T) {
+		config := &Config{Settings: Settings{ToolsPolicy: "yolo"}}
+		validator := NewConfigValidator(config)
+		result := &ValidationResult{Valid: true, Errors: []ValidationError{}}
+		validator.validateSettings(result)
+
+		found := false
+		for _, err := range result.Errors {
+			if err.Field == "settings.tools_policy" && err.Severity == SeverityError {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Expected error for invalid tools_policy value, but got: %v", result.Errors)
+		}
+	})
+}
+
 func TestConfigValidator_ValidateTools(t *testing.T) {
 	t.Run("EmptyToolName", func(t *testing.T) {
 		config := &Config{
