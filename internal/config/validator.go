@@ -72,6 +72,9 @@ func (v *ConfigValidator) Validate() *ValidationResult {
 		Errors: []ValidationError{},
 	}
 
+	// Validate settings section
+	v.validateSettings(result)
+
 	// Validate tools section
 	v.validateTools(result)
 
@@ -88,6 +91,23 @@ func (v *ConfigValidator) Validate() *ValidationResult {
 	result.Valid = !v.hasCriticalOrErrorSeverity(result.Errors)
 
 	return result
+}
+
+// validateSettings validates the optional settings section of the configuration
+func (v *ConfigValidator) validateSettings(result *ValidationResult) {
+	if v.config.Settings.ToolsPolicy == "" {
+		return
+	}
+
+	if v.config.Settings.ToolsPolicy != ToolsPolicyInstall && v.config.Settings.ToolsPolicy != ToolsPolicyRecommend {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:      "settings.tools_policy",
+			Value:      v.config.Settings.ToolsPolicy,
+			Issue:      "Invalid tools_policy value",
+			Suggestion: fmt.Sprintf("Use '%s' or '%s'", ToolsPolicyInstall, ToolsPolicyRecommend),
+			Severity:   SeverityError,
+		})
+	}
 }
 
 // validateTools validates the tools section of the configuration
