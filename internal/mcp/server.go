@@ -139,13 +139,21 @@ func (s *MCPServer) handleRunAutoFix(ctx context.Context, request mcp.CallToolRe
 }
 
 func (s *MCPServer) handleCheckEnvironment(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	checks := s.doctorService.Run()
+	return mcp.NewToolResultText(formatEnvironmentReport(s.doctorService.Run())), nil
+}
 
+// formatEnvironmentReport renders doctor checks as the text an agent reads.
+func formatEnvironmentReport(checks []service.DoctorCheck) string {
 	allOK := true
+	skipped := 0
 	var textOutput string
 	for _, check := range checks {
 		status := "OK"
-		if !check.OK {
+		switch {
+		case check.Skipped:
+			status = "SKIP"
+			skipped++
+		case !check.OK:
 			status = "FAIL"
 			allOK = false
 		}
@@ -157,11 +165,16 @@ func (s *MCPServer) handleCheckEnvironment(ctx context.Context, request mcp.Call
 		textOutput += "\n"
 	}
 
-	if allOK {
-		textOutput = "Environment is healthy.\n\n" + textOutput
-	} else {
+	// A skipped check must not be summarized as healthy without qualification:
+	// an agent would otherwise read "healthy" as "every tool was verified".
+	switch {
+	case !allOK:
 		textOutput = "Environment has issues.\n\n" + textOutput
+	case skipped > 0:
+		textOutput = fmt.Sprintf("Environment is healthy, but %d check(s) could not be verified.\n\n", skipped) + textOutput
+	default:
+		textOutput = "Environment is healthy.\n\n" + textOutput
 	}
 
-	return mcp.NewToolResultText(textOutput), nil
+	return textOutput
 }

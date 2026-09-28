@@ -11,11 +11,14 @@ import (
 	"github.com/dmux/go-quality-gate/internal/repository"
 )
 
-// DoctorCheck is the outcome of one installation health check.
+// DoctorCheck is the outcome of one installation health check. Skipped marks
+// a check that could not be performed at all: it is not a failure, but
+// reporting it as a plain pass would claim verification that never happened.
 type DoctorCheck struct {
-	Name   string `json:"name"`
-	OK     bool   `json:"ok"`
-	Detail string `json:"detail,omitempty"`
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Skipped bool   `json:"skipped,omitempty"`
+	Detail  string `json:"detail,omitempty"`
 }
 
 // DoctorService reports whether quality-gate is correctly wired into the
@@ -90,7 +93,7 @@ func checkToolAvailability(tool config.Tool) DoctorCheck {
 	}
 	cmdName := parts[0]
 	if strings.ContainsAny(cmdName, "/|&") {
-		return DoctorCheck{Name: name, OK: true, Detail: "skipped (complex check_command)"}
+		return DoctorCheck{Name: name, OK: true, Skipped: true, Detail: "not verified (complex check_command)"}
 	}
 
 	if _, err := exec.LookPath(cmdName); err != nil {

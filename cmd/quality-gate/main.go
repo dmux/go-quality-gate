@@ -457,7 +457,10 @@ func runDoctor(gitRepo *git.RealGitRepository, output string, stdout io.Writer) 
 	} else {
 		for _, c := range checks {
 			icon := "✅"
-			if !c.OK {
+			switch {
+			case c.Skipped:
+				icon = "⏭️"
+			case !c.OK:
 				icon = "❌"
 			}
 			if c.Detail != "" {

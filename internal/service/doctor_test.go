@@ -174,6 +174,32 @@ hooks: {}
 	}
 }
 
+func TestDoctorService_Run_ComplexCheckCommandIsSkippedNotPassed(t *testing.T) {
+	dir := t.TempDir()
+	writeQualityYML(t, dir, `tools:
+  - name: "Vendored Tool"
+    check_command: "./node_modules/.bin/eslint --version"
+    install_command: "npm install eslint"
+hooks: {}
+`)
+	t.Chdir(dir)
+	t.Setenv("PATH", t.TempDir())
+
+	svc := NewDoctorService(&fakeHookInspector{dir: t.TempDir()}, "quality.yml")
+	checks := svc.Run()
+
+	check, ok := findCheck(checks, "Vendored Tool tool")
+	if !ok {
+		t.Fatal("expected a 'Vendored Tool tool' check")
+	}
+	if !check.Skipped {
+		t.Error("expected a complex check_command to be reported as skipped, not verified")
+	}
+	if !check.OK {
+		t.Error("a skipped check is not a failure and must not break the doctor exit code")
+	}
+}
+
 func TestDoctorService_Run_RuntimeAvailability(t *testing.T) {
 	dir := t.TempDir()
 	writeQualityYML(t, dir, "tools: []\nhooks: {}\n")
