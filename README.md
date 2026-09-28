@@ -191,6 +191,10 @@ missing:
   naturally if the tool turns out to be required — useful in locked-down
   environments where silent installs aren't acceptable.
 
+Any other value is a configuration error that blocks execution, rather than
+falling back to `install`: if you asked for `recommend` and mistyped it,
+silently auto-installing tools would be the opposite of what you wanted.
+
 ## 📘 How to Use
 
 ### 1. Build
