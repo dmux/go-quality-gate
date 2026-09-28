@@ -37,8 +37,13 @@ func NewCachingToolManagerService(shellRunner repository.ShellRunner, logger log
 // config.ToolsPolicyRecommend, a missing tool is only reported (with its
 // install command) rather than installed automatically; any other value
 // (including "") keeps the default auto-install behavior.
-
 func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy string) error {
+	// Normalize before hashing so equivalent policies ("" and "install") can
+	// never produce two different cache fingerprints for the same tools.
+	if policy == "" {
+		policy = config.ToolsPolicyInstall
+	}
+
 	toolsHash := hashTools(tools, policy)
 
 	if s.state != nil {
@@ -95,10 +100,10 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy st
 	return nil
 }
 
-// hashTools fingerprints a tools configuration, together with the policy it
-// was validated under, for the install-check cache. Without the policy, tools
-// accepted under "install" would satisfy the cache after a switch to
-// "recommend" and their recommendations would never be printed.
+// hashTools fingerprints a tools configuration, together with the normalized
+// policy it was validated under, for the install-check cache. Without the
+// policy, tools accepted under "install" would satisfy the cache after a
+// switch to "recommend" and their recommendations would never be printed.
 //
 // The marshal error is intentionally ignored: domain.Tool has only string
 // fields, so json.Marshal on a []domain.Tool can never fail.
