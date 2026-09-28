@@ -302,6 +302,46 @@ func TestMCPServer_CheckEnvironment(t *testing.T) {
 	}
 }
 
+func TestFormatEnvironmentReport(t *testing.T) {
+	cases := []struct {
+		name     string
+		checks   []service.DoctorCheck
+		wantHead string
+		wantLine string
+	}{
+		{
+			name:     "all passing",
+			checks:   []service.DoctorCheck{{Name: "pre-commit hook", OK: true}},
+			wantHead: "Environment is healthy.",
+			wantLine: "[OK] pre-commit hook",
+		},
+		{
+			name:     "a failure wins over everything",
+			checks:   []service.DoctorCheck{{Name: "go runtime", Detail: "not found"}, {Name: "piped tool", OK: true, Skipped: true}},
+			wantHead: "Environment has issues.",
+			wantLine: "[FAIL] go runtime: not found",
+		},
+		{
+			name:     "skipped check qualifies the healthy verdict",
+			checks:   []service.DoctorCheck{{Name: "pre-commit hook", OK: true}, {Name: "piped tool", OK: true, Skipped: true, Detail: "not verified"}},
+			wantHead: "Environment is healthy, but 1 check(s) could not be verified.",
+			wantLine: "[SKIP] piped tool: not verified",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report := formatEnvironmentReport(tc.checks)
+			if !strings.HasPrefix(report, tc.wantHead) {
+				t.Errorf("report should start with %q, got:\n%s", tc.wantHead, report)
+			}
+			if !strings.Contains(report, tc.wantLine) {
+				t.Errorf("report should contain %q, got:\n%s", tc.wantLine, report)
+			}
+		})
+	}
+}
+
 func TestMCPServer_Start_ReturnsWhenStdinCloses(t *testing.T) {
 	origStdin, origStdout := os.Stdin, os.Stdout
 
