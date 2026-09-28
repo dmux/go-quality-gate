@@ -63,8 +63,11 @@ func (d *LanguageDetector) DetectProjectStructure() (*ProjectStructure, error) {
 			return err
 		}
 
-		// Skip hidden directories and common build/vendor directories
-		if info.IsDir() && shouldSkipDirectory(info.Name()) {
+		// Skip hidden directories and common build/vendor directories. The
+		// walk root is exempt: its own base name may legitimately be
+		// dot-prefixed ("." for a relative path, or ~/.config/app), which
+		// would otherwise abort the walk before any file is analyzed.
+		if info.IsDir() && path != d.projectPath && shouldSkipDirectory(info.Name()) {
 			return filepath.SkipDir
 		}
 
