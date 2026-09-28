@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dmux/go-quality-gate/internal/config"
@@ -90,6 +91,63 @@ func TestToolManagerService_InvalidatesCacheWhenToolsChange(t *testing.T) {
 	}
 	if got := runner.calls["new-tool --version"]; got != 1 {
 		t.Errorf("new tool check ran %d times, want 1", got)
+	}
+}
+
+func TestToolManagerService_InvalidatesCacheWhenPolicyChanges(t *testing.T) {
+	runner := &countingShellRunner{
+		commands: map[string]error{"tool --version": nil},
+		calls:    make(map[string]int),
+	}
+	state := &memoryToolState{}
+	manager := NewCachingToolManagerService(runner, &MockLogger{}, state)
+	tools := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
+
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); err != nil {
+		t.Fatalf("validation under install policy failed: %v", err)
+	}
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyRecommend); err != nil {
+		t.Fatalf("validation under recommend policy failed: %v", err)
+	}
+
+	if got := runner.calls["tool --version"]; got != 2 {
+		t.Fatalf("check command ran %d times after a policy change, want 2", got)
+	}
+}
+
+func TestToolManagerService_KeepsRecommendingMissingToolAcrossRuns(t *testing.T) {
+	runner := &countingShellRunner{
+		commands: map[string]error{"tool --version": errors.New("not installed")},
+		calls:    make(map[string]int),
+	}
+	state := &memoryToolState{}
+	logger := &MockLogger{}
+	manager := NewCachingToolManagerService(runner, logger, state)
+	tools := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
+
+	for run := 1; run <= 2; run++ {
+		if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyRecommend); err != nil {
+			t.Fatalf("run %d failed: %v", run, err)
+		}
+	}
+
+	if got := runner.calls["tool --version"]; got != 2 {
+		t.Errorf("check command ran %d times, want 2", got)
+	}
+	if got := runner.calls["install tool"]; got != 0 {
+		t.Errorf("recommend policy ran the install command %d times", got)
+	}
+	if state.saveCalls != 0 {
+		t.Errorf("a run with unresolved tools was cached %d times", state.saveCalls)
+	}
+	recommendations := 0
+	for _, msg := range logger.Messages {
+		if strings.Contains(msg, "install tool") {
+			recommendations++
+		}
+	}
+	if recommendations != 2 {
+		t.Errorf("recommendation was printed %d times, want 2", recommendations)
 	}
 }
 
