@@ -115,6 +115,27 @@ func TestToolManagerService_InvalidatesCacheWhenPolicyChanges(t *testing.T) {
 	}
 }
 
+func TestToolManagerService_TreatsEmptyPolicyAsInstallForCaching(t *testing.T) {
+	runner := &countingShellRunner{
+		commands: map[string]error{"tool --version": nil},
+		calls:    make(map[string]int),
+	}
+	state := &memoryToolState{}
+	manager := NewCachingToolManagerService(runner, &MockLogger{}, state)
+	tools := []domain.Tool{{Name: "Tool", CheckCommand: "tool --version", InstallCommand: "install tool"}}
+
+	if err := manager.EnsureToolsInstalled(tools, config.ToolsPolicyInstall); err != nil {
+		t.Fatalf("validation under install policy failed: %v", err)
+	}
+	if err := manager.EnsureToolsInstalled(tools, ""); err != nil {
+		t.Fatalf("validation under empty policy failed: %v", err)
+	}
+
+	if got := runner.calls["tool --version"]; got != 1 {
+		t.Errorf("check command ran %d times, want 1: %q and %q are the same policy and must share a cache entry", got, "", config.ToolsPolicyInstall)
+	}
+}
+
 func TestToolManagerService_KeepsRecommendingMissingToolAcrossRuns(t *testing.T) {
 	runner := &countingShellRunner{
 		commands: map[string]error{"tool --version": errors.New("not installed")},
