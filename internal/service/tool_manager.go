@@ -39,7 +39,7 @@ func NewCachingToolManagerService(shellRunner repository.ShellRunner, logger log
 // (including "") keeps the default auto-install behavior.
 
 func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy string) error {
-	toolsHash := hashTools(tools)
+	toolsHash := hashTools(tools, policy)
 
 	if s.state != nil {
 		cachedHash, cacheErr := s.state.LoadToolsHash()
@@ -47,6 +47,8 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy st
 			return nil
 		}
 	}
+
+	stillMissing := false
 
 	for _, tool := range tools {
 		s.logger.StartSpinner(fmt.Sprintf("Checking if %s is installed...", tool.Name))
@@ -59,6 +61,7 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy st
 
 		if err != nil {
 			if policy == config.ToolsPolicyRecommend {
+				stillMissing = true
 				s.logger.Print("⚠️  %s is not installed. Recommended install command: %s\n", tool.Name, tool.InstallCommand)
 				continue
 			}
@@ -80,19 +83,30 @@ func (s *ToolManagerService) EnsureToolsInstalled(tools []domain.Tool, policy st
 		}
 	}
 
+	// Caching a run that ended with unresolved tools would silence the
+	// recommendation on every later run, since recommend mode never installs
+	// anything to make the state true.
+	//
 	// Cache failures must not prevent the quality gate from running. They only
 	// cause the tools to be checked again on the next execution.
-	if s.state != nil {
+	if s.state != nil && !stillMissing {
 		_ = s.state.SaveToolsHash(toolsHash)
 	}
 	return nil
 }
 
-// hashTools fingerprints a tools configuration for the install-check cache.
+// hashTools fingerprints a tools configuration, together with the policy it
+// was validated under, for the install-check cache. Without the policy, tools
+// accepted under "install" would satisfy the cache after a switch to
+// "recommend" and their recommendations would never be printed.
+//
 // The marshal error is intentionally ignored: domain.Tool has only string
 // fields, so json.Marshal on a []domain.Tool can never fail.
-func hashTools(tools []domain.Tool) string {
-	content, _ := json.Marshal(tools)
+func hashTools(tools []domain.Tool, policy string) string {
+	content, _ := json.Marshal(struct {
+		Tools  []domain.Tool `json:"tools"`
+		Policy string        `json:"policy"`
+	}{Tools: tools, Policy: policy})
 	digest := sha256.Sum256(content)
 	return hex.EncodeToString(digest[:])
 }

@@ -1,6 +1,10 @@
 package service
 
-import "github.com/dmux/go-quality-gate/internal/domain"
+import (
+	"fmt"
+
+	"github.com/dmux/go-quality-gate/internal/domain"
+)
 
 // MockToolManager is a mock implementation of the repository.ToolManager interface.
 type MockToolManager struct {
@@ -62,7 +66,7 @@ type MockLogger struct {
 
 // Print implements the Logger interface.
 func (m *MockLogger) Print(format string, args ...interface{}) {
-	// For testing, we just ignore the output
+	m.Messages = append(m.Messages, fmt.Sprintf(format, args...))
 }
 
 // Println implements the Logger interface.
