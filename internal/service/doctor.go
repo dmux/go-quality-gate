@@ -59,9 +59,8 @@ func (s *DoctorService) Run() []DoctorCheck {
 		checks = append(checks, checkToolAvailability(tool))
 	}
 
-	// filepath.Abs matters here: LanguageDetector's walk treats a root path
-	// of "." (what filepath.Dir("quality.yml") returns) as dot-prefixed and
-	// skips it entirely, so relative configPaths must be resolved first.
+	// filepath.Dir("quality.yml") is ".", so resolve it to keep the reported
+	// paths absolute and unambiguous.
 	projectDir, err := filepath.Abs(filepath.Dir(s.configPath))
 	if err != nil {
 		projectDir = filepath.Dir(s.configPath)
