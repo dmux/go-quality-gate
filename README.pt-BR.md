@@ -143,6 +143,10 @@ configurada está ausente:
   naturalmente caso a ferramenta seja realmente necessária — útil em
   ambientes restritos onde instalações silenciosas não são aceitáveis.
 
+Qualquer outro valor é um erro de configuração que bloqueia a execução, em vez
+de voltar para `install`: se você pediu `recommend` e digitou errado, instalar
+ferramentas automaticamente em silêncio seria o oposto do que você queria.
+
 ## 📘 Como Usar
 
 ### 1. Compilação
