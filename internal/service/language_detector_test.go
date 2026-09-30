@@ -58,6 +58,54 @@ func TestDetectProjectStructure_EmptyDirectory(t *testing.T) {
 	}
 }
 
+func TestDetectProjectStructure_RelativeDotRoot(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module example.com/foo\n")
+	t.Chdir(dir)
+
+	structure, err := NewLanguageDetector(".").DetectProjectStructure()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasLang(structure, LanguageGo) {
+		t.Errorf("expected Go to be detected from a %q root, got %v", ".", structure.Languages)
+	}
+}
+
+func TestDetectProjectStructure_DotPrefixedRootDirectory(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".config/app/go.mod", "module example.com/foo\n")
+
+	structure, err := NewLanguageDetector(filepath.Join(dir, ".config")).DetectProjectStructure()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasLang(structure, LanguageGo) {
+		t.Errorf("expected Go to be detected under a dot-prefixed root, got %v", structure.Languages)
+	}
+}
+
+func TestDetectProjectStructure_SkipsNestedHiddenDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".hidden/Cargo.toml", "[package]\nname=\"foo\"\n")
+	writeFile(t, dir, "node_modules/package.json", "{}\n")
+	writeFile(t, dir, "go.mod", "module example.com/foo\n")
+
+	structure, err := NewLanguageDetector(dir).DetectProjectStructure()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasLang(structure, LanguageGo) {
+		t.Errorf("expected Go to be detected, got %v", structure.Languages)
+	}
+	if hasLang(structure, LanguageRust) {
+		t.Error("nested hidden directory was walked")
+	}
+	if hasLang(structure, LanguageNode) {
+		t.Error("node_modules was walked")
+	}
+}
+
 func TestDetectProjectStructure_NonexistentPath(t *testing.T) {
 	detector := NewLanguageDetector(filepath.Join(t.TempDir(), "does-not-exist"))
 

@@ -77,6 +77,9 @@ git commit -m "feat: nova funcionalidade"
 ## ⚙️ Configuração (quality.yml)
 
 ```yaml
+settings:
+  tools_policy: install # "install" (padrão) ou "recommend"
+
 tools:
   - name: "Gitleaks"
     check_command: "gitleaks version"
@@ -130,6 +133,20 @@ hooks:
 > offline? Pule o gate com `QG_SKIP="offline" git commit …` ou remova os
 > comandos de audit do seu `quality.yml`.
 
+O campo `settings.tools_policy` controla o que acontece quando uma ferramenta
+configurada está ausente:
+
+- `install` (padrão): o quality-gate executa o `install_command` da
+  ferramenta automaticamente, como já acontecia antes dessa opção existir.
+- `recommend`: o quality-gate nunca instala nada por conta própria. Em vez
+  disso, imprime o comando de instalação recomendado e deixa o hook falhar
+  naturalmente caso a ferramenta seja realmente necessária — útil em
+  ambientes restritos onde instalações silenciosas não são aceitáveis.
+
+Qualquer outro valor é um erro de configuração que bloqueia a execução, em vez
+de voltar para `install`: se você pediu `recommend` e digitou errado, instalar
+ferramentas automaticamente em silêncio seria o oposto do que você queria.
+
 ## 📘 Como Usar
 
 ### 1. Compilação
@@ -156,7 +173,12 @@ O programa irá configurar automaticamente os hooks `pre-commit` e `pre-push`.
 
 ### 4. Configuração (quality.yml)
 
-A configuração é dividida em duas seções principais:
+A configuração é dividida em três seções principais:
+
+- **`settings`** (opcional): Flags globais de comportamento
+  - `tools_policy`: `install` (padrão, instala automaticamente ferramentas
+    ausentes) ou `recommend` (apenas recomenda o comando de instalação, sem
+    executá-lo)
 
 - **`tools`**: Lista de ferramentas necessárias para o projeto
 
@@ -260,7 +282,7 @@ hooks:
 | `--fix`         | Executa correções automáticas                    | `./quality-gate --fix pre-commit`         |
 | `--install --global` | Aplica o gate em todos os repositórios do usuário (`core.hooksPath` global) | `./quality-gate --install --global` |
 | `verify`        | Verifica o watermark dos commits (para CI)       | `./quality-gate verify --range origin/main..HEAD` |
-| `doctor`        | Confere hooks, binário e quality.yml             | `./quality-gate doctor`                   |
+| `doctor`        | Confere hooks, quality.yml, ferramentas configuradas e runtimes | `./quality-gate doctor`      |
 | `mcp`           | Roda como um servidor MCP para integração com IA | `./quality-gate mcp`                      |
 | `--version, -v` | Mostra informações de versão                     | `./quality-gate --version`                |
 | `--output=json` | Output estruturado para CI/CD                    | `./quality-gate --output=json pre-commit` |
@@ -270,13 +292,13 @@ hooks:
 ```bash
 # Versão simples
 ./quality-gate --version
-# Output: quality-gate version 1.3.0
+# Output: quality-gate version 1.4.0
 
 # Versão em JSON com detalhes de build
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -291,7 +313,7 @@ Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar 
 ```
 feat: adiciona login
 
-Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 ```
 
 - `--no-verify` pula os dois hooks, então o commit sai **sem** trailer.
@@ -399,6 +421,7 @@ Para usar o `go-quality-gate` com ferramentas como o Cursor, basta configurar o 
 O servidor expõe as seguintes "Tools" (ferramentas) para a sua IA:
 1. `run_quality_checks`: Executa linters e formatações, retornando diagnósticos parseados para a IA corrigir.
 2. `run_auto_fix`: Permite que a IA acione os comandos de formatação automáticos configurados no `quality.yml`.
+3. `check_environment`: Informa se os git hooks, o `quality.yml`, as ferramentas configuradas e os runtimes de linguagem detectados estão corretamente instalados — as mesmas verificações do `quality-gate doctor`, disponíveis diretamente para o agente.
 
 ## 🛠️ Desenvolvimento
 

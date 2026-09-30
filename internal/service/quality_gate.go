@@ -26,7 +26,7 @@ func NewQualityGateService(toolManager repository.ToolManager, hookRunner reposi
 
 func (s *QualityGateService) Run(cfg *config.Config, hookType string, parallel bool) ([]domain.ExecutionResult, error) {
 	// 1. Ensure all tools are installed.
-	if err := s.toolManager.EnsureToolsInstalled(s.configToolsToDomain(cfg.Tools)); err != nil {
+	if err := s.toolManager.EnsureToolsInstalled(s.configToolsToDomain(cfg.Tools), cfg.Settings.InstallPolicy()); err != nil {
 		return nil, fmt.Errorf("failed to ensure tools are installed: %w", err)
 	}
 
