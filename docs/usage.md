@@ -18,6 +18,14 @@ go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest
 quality-gate --version
 ```
 
+If you installed with Go, upgrade to the latest release at any time with:
+
+```bash
+quality-gate --update
+```
+
+It runs `go install ...@latest` for you and prints the version it moved to (e.g. `Updated quality-gate: v1.4.0 -> v1.5.0`).
+
 ## 2. Create the configuration
 
 At the root of your repository:

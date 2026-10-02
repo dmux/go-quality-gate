@@ -263,6 +263,7 @@ hooks:
 | `doctor`        | Confere hooks, binário e quality.yml             | `./quality-gate doctor`                   |
 | `mcp`           | Roda como um servidor MCP para integração com IA | `./quality-gate mcp`                      |
 | `--version, -v` | Mostra informações de versão                     | `./quality-gate --version`                |
+| `--update`      | Atualiza o quality-gate para a última versão (via Go) | `./quality-gate --update`            |
 | `--output=json` | Output estruturado para CI/CD                    | `./quality-gate --output=json pre-commit` |
 
 ### 📊 Informações de Versão

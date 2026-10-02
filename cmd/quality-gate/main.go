@@ -30,6 +30,19 @@ func main() {
 // realistically fail to marshal, so a real failure isn't reproducible.
 var marshalJSONIndent = json.MarshalIndent
 
+// updater performs a self-update; it's the subset of service.UpdateService
+// that run() needs, so tests can substitute a fake without touching the
+// network or the Go toolchain.
+type updater interface {
+	Update() (service.UpdateResult, error)
+}
+
+// newUpdateService builds the updater used by the --update flag. It's a var so
+// tests can swap in a fake, mirroring marshalJSONIndent above.
+var newUpdateService = func(version string) updater {
+	return service.NewUpdateService(&shell.RealShellRunner{}, version)
+}
+
 // run implements the CLI end to end, returning a process exit code instead
 // of calling os.Exit directly, and writing to the given streams instead of
 // hardcoding os.Stdout/os.Stderr, so it's fully exercisable from tests.
@@ -42,6 +55,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fixFlag := fs.Bool("fix", false, "Fix fixable issues")
 	versionFlag := fs.Bool("version", false, "Show version information")
 	versionFlagShort := fs.Bool("v", false, "Show version information (shorthand)")
+	updateFlag := fs.Bool("update", false, "Update quality-gate to the latest version")
 	outputFlag := fs.String("output", "", "Output format (e.g., json)")
 	parallelFlag := fs.Bool("parallel", false, "Run independent hooks concurrently")
 	portFlag := fs.Int("port", 4173, "Port for the 'ui' web dashboard")
@@ -95,6 +109,34 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
+	if *updateFlag {
+		logPrintln("Updating quality-gate to the latest version...")
+		updateService := newUpdateService(Version)
+		result, err := updateService.Update()
+		if err != nil {
+			logPrint("Error updating quality-gate: %v\n", err)
+			return 1
+		}
+		if isJsonOutput {
+			jsonBytes, marshalErr := marshalJSONIndent(result, "", "  ")
+			if marshalErr != nil {
+				logPrint("Error marshaling update JSON: %v\n", marshalErr)
+				return 1
+			}
+			fmt.Fprintln(stdout, string(jsonBytes))
+			return 0
+		}
+		switch {
+		case result.Updated:
+			logPrint("Updated quality-gate: %s -> %s\n", result.PreviousVersion, result.NewVersion)
+		case result.NewVersion != "":
+			logPrint("quality-gate is already up to date (%s).\n", result.NewVersion)
+		default:
+			logPrintln("quality-gate updated successfully.")
+		}
+		return 0
+	}
+
 	if *installFlag {
 		if *globalFlag {
 			if err := installGlobalHooks(); err != nil {
@@ -145,6 +187,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		logPrintln("  --init        Initialize quality.yml with intelligent analysis")
 		logPrintln("  --fix         Automatically fix detected issues")
 		logPrintln("  --version, -v Show version information")
+		logPrintln("  --update Update quality-gate to the latest version")
 		logPrintln("  --output json Output results in JSON format")
 		logPrintln("  --parallel    Run independent hooks concurrently")
 		logPrintln("  --port N      Port for 'ui' web dashboard (default 4173)")
@@ -157,6 +200,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		logPrintln("  quality-gate verify --range origin/main..HEAD  # Check watermarks")
 		logPrintln("  QG_SKIP=\"reason\" git commit      # Skip checks, leaving an audit trailer")
 		logPrintln("  quality-gate --version           # Show version")
+		logPrintln("  quality-gate --update            # Update to the latest version")
 		return 1
 	}
 
