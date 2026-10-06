@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/dmux/go-quality-gate/internal/service"
 )
 
 // runCLI invokes run() with the given args, capturing stdout/stderr into
@@ -104,6 +106,79 @@ func TestRun_Version_JSONMarshalError(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Error marshaling version JSON") {
 		t.Errorf("expected a marshal error message, got %q", stdout)
+	}
+}
+
+// --- update ---
+
+// fakeUpdater is a test double for the updater interface.
+type fakeUpdater struct {
+	result service.UpdateResult
+	err    error
+}
+
+func (f fakeUpdater) Update() (service.UpdateResult, error) { return f.result, f.err }
+
+// withFakeUpdater swaps newUpdateService for one returning the given fake,
+// restoring the original afterwards.
+func withFakeUpdater(t *testing.T, fake fakeUpdater) {
+	t.Helper()
+	orig := newUpdateService
+	newUpdateService = func(string) updater { return fake }
+	t.Cleanup(func() { newUpdateService = orig })
+}
+
+func TestRun_Update_NewVersion_Text(t *testing.T) {
+	withFakeUpdater(t, fakeUpdater{result: service.UpdateResult{
+		PreviousVersion: "v1.4.0", NewVersion: "v1.5.0", Updated: true,
+	}})
+	code, stdout, _ := runCLI("--update")
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	if !strings.Contains(stdout, "v1.4.0") || !strings.Contains(stdout, "v1.5.0") {
+		t.Errorf("expected old and new versions in output, got %q", stdout)
+	}
+}
+
+func TestRun_Update_AlreadyUpToDate_Text(t *testing.T) {
+	withFakeUpdater(t, fakeUpdater{result: service.UpdateResult{
+		PreviousVersion: "v1.5.0", NewVersion: "v1.5.0", Updated: false,
+	}})
+	code, stdout, _ := runCLI("--update")
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	if !strings.Contains(stdout, "already up to date") {
+		t.Errorf("expected up-to-date message, got %q", stdout)
+	}
+}
+
+func TestRun_Update_JSON(t *testing.T) {
+	withFakeUpdater(t, fakeUpdater{result: service.UpdateResult{
+		PreviousVersion: "v1.4.0", NewVersion: "v1.5.0", Updated: true,
+	}})
+	code, stdout, _ := runCLI("--update", "--output=json")
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	var payload service.UpdateResult
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("expected valid JSON, got %q: %v", stdout, err)
+	}
+	if payload.NewVersion != "v1.5.0" || !payload.Updated {
+		t.Errorf("unexpected payload: %+v", payload)
+	}
+}
+
+func TestRun_Update_Failure(t *testing.T) {
+	withFakeUpdater(t, fakeUpdater{err: errors.New("boom")})
+	code, stdout, _ := runCLI("--update")
+	if code != 1 {
+		t.Fatalf("expected exit 1, got %d", code)
+	}
+	if !strings.Contains(stdout, "Error updating quality-gate") {
+		t.Errorf("expected an error message, got %q", stdout)
 	}
 }
 

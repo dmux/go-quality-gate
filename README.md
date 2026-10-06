@@ -71,6 +71,8 @@ sudo mv quality-gate-darwin-arm64 /usr/local/bin/quality-gate
 go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest
 ```
 
+To upgrade later, run `quality-gate --update`, which runs the same `go install ...@latest` and prints the version it moved to.
+
 #### Option C: Using Docker
 
 ```bash
@@ -315,6 +317,7 @@ hooks:
 | `doctor`        | Checks hooks, binary and quality.yml are in place       | `./quality-gate doctor`                   |
 | `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
+| `--update`      | Updates quality-gate to the latest version (via Go)     | `./quality-gate --update`                 |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
 | `--parallel`    | Runs independent hooks concurrently (opt-in)            | `./quality-gate --parallel pre-commit`    |
 
