@@ -52,6 +52,11 @@ runs:
         PR_HEAD: ${{ github.event.pull_request.head.sha }}
         PUSH_BEFORE: ${{ github.event.before }}
       run: |
+        # The watermark is opt-in (settings.watermark: true in quality.yml).
+        if ! grep -Eq '^[[:space:]]+watermark:[[:space:]]*true' quality.yml 2>/dev/null; then
+          echo "Commit watermark is not enabled in quality.yml; skipping verification."
+          exit 0
+        fi
         range="$QG_RANGE"
         if [ -z "$range" ]; then
           if [ -n "$PR_BASE" ]; then

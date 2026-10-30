@@ -75,6 +75,8 @@ git add .
 git commit -m "feat: adiciona login"
 ```
 
+> O watermark é **opt-in**. Adicione `settings:` → `watermark: true` ao `quality.yml` para ativá-lo; sem isso, os passos 1 e 3 abaixo apenas executam os checks e deixam a mensagem intacta.
+
 O que acontece por trás:
 
 1. **`pre-commit`** roda os checks do `quality.yml`.

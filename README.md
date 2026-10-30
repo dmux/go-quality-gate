@@ -361,6 +361,15 @@ hooks:
 
 ## 🔏 Enforcement and Commit Watermark
 
+> **Opt-in.** The commit watermark is **disabled by default**. Enable it per repository in `quality.yml`:
+>
+> ```yaml
+> settings:
+>   watermark: true
+> ```
+>
+> While disabled, no attestation is recorded, `commit-msg` leaves the message untouched, `QG_SKIP` skips the checks without adding a trailer, and the GitHub Action skips the `verify` step. `quality-gate verify` can still be run by hand.
+
 Client-side hooks can always be bypassed (`git commit --no-verify`, deleting the hook). quality-gate therefore works in two layers:
 
 **1. Watermark on the client.** When every `pre-commit` check passes, quality-gate records an attestation bound to the exact staged content (`git write-tree`). The `commit-msg` hook then appends a trailer:

@@ -63,7 +63,8 @@ func NewTemplateGeneratorWithRoot(projectPath string) *TemplateGenerator {
 
 // GenerateTemplate creates a quality.yml template based on project structure
 func (g *TemplateGenerator) GenerateTemplate(structure *ProjectStructure) string {
-	var sections []string
+	// Commit watermarks are opt-in, so the template only documents the switch.
+	sections := []string{"# settings:\n#   watermark: true   # append a Quality-Gate trailer to commits that pass the checks (verify with `quality-gate verify`)"}
 
 	// Generate tools section
 	tools := g.generateTools(structure)
