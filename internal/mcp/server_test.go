@@ -327,6 +327,12 @@ func TestFormatEnvironmentReport(t *testing.T) {
 			wantHead: "Environment is healthy, but 1 check(s) could not be verified.",
 			wantLine: "[SKIP] piped tool: not verified",
 		},
+		{
+			name:     "missing auto-installable tool is a warning, not an issue",
+			checks:   []service.DoctorCheck{{Name: "ruff tool", OK: true, Warning: true, Detail: "will be installed"}},
+			wantHead: "Environment is healthy, but 1 tool(s) are missing and will be installed on the next run.",
+			wantLine: "[WARN] ruff tool: will be installed",
+		},
 	}
 
 	for _, tc := range cases {

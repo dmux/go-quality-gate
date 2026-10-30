@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/domain"
@@ -146,6 +147,7 @@ func (s *MCPServer) handleCheckEnvironment(ctx context.Context, request mcp.Call
 func formatEnvironmentReport(checks []service.DoctorCheck) string {
 	allOK := true
 	skipped := 0
+	warnings := 0
 	var textOutput string
 	for _, check := range checks {
 		status := "OK"
@@ -153,6 +155,9 @@ func formatEnvironmentReport(checks []service.DoctorCheck) string {
 		case check.Skipped:
 			status = "SKIP"
 			skipped++
+		case check.Warning:
+			status = "WARN"
+			warnings++
 		case !check.OK:
 			status = "FAIL"
 			allOK = false
@@ -170,8 +175,15 @@ func formatEnvironmentReport(checks []service.DoctorCheck) string {
 	switch {
 	case !allOK:
 		textOutput = "Environment has issues.\n\n" + textOutput
-	case skipped > 0:
-		textOutput = fmt.Sprintf("Environment is healthy, but %d check(s) could not be verified.\n\n", skipped) + textOutput
+	case skipped > 0 || warnings > 0:
+		var notes []string
+		if skipped > 0 {
+			notes = append(notes, fmt.Sprintf("%d check(s) could not be verified", skipped))
+		}
+		if warnings > 0 {
+			notes = append(notes, fmt.Sprintf("%d tool(s) are missing and will be installed on the next run", warnings))
+		}
+		textOutput = fmt.Sprintf("Environment is healthy, but %s.\n\n", strings.Join(notes, " and ")) + textOutput
 	default:
 		textOutput = "Environment is healthy.\n\n" + textOutput
 	}
