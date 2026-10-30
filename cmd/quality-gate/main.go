@@ -223,7 +223,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if skipReason := os.Getenv(service.SkipEnvVar); skipReason != "" && (hookType == "pre-commit" || hookType == "pre-push") {
-		logPrint("⚠️  Quality gate skipped (%s=%q); the commit will carry a %s trailer.\n", service.SkipEnvVar, skipReason, domain.SkipTrailer)
+		if watermarkEnabled() {
+			logPrint("⚠️  Quality gate skipped (%s=%q); the commit will carry a %s trailer.\n", service.SkipEnvVar, skipReason, domain.SkipTrailer)
+		} else {
+			logPrint("⚠️  Quality gate skipped (%s=%q).\n", service.SkipEnvVar, skipReason)
+		}
 		return 0
 	}
 
@@ -372,10 +376,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// watermarkEnabled reports whether quality.yml opts in to commit watermarks.
+// A missing or unreadable config counts as disabled: the commit-msg hook must
+// never fail a commit because of it.
+func watermarkEnabled() bool {
+	cfg, err := config.LoadConfig("quality.yml")
+	return err == nil && cfg.Settings.WatermarkEnabled()
+}
+
 // recordAttestation stores the watermark for the commit being created. Only
-// pre-commit results describe the staged content, so other hooks are ignored.
+// pre-commit results describe the staged content, so other hooks are ignored,
+// and nothing is recorded unless the watermark is enabled.
 func recordAttestation(attestation *service.AttestationService, hookType string, results []domain.ExecutionResult) error {
-	if hookType != "pre-commit" {
+	if hookType != "pre-commit" || !watermarkEnabled() {
 		return nil
 	}
 	configContent, err := os.ReadFile("quality.yml")
@@ -388,6 +401,9 @@ func recordAttestation(attestation *service.AttestationService, hookType string,
 // runCommitMsg watermarks the commit message. It never blocks the commit:
 // enforcement happens in CI through `quality-gate verify`.
 func runCommitMsg(attestation *service.AttestationService, messageFile string, stderr io.Writer) {
+	if !watermarkEnabled() {
+		return
+	}
 	configContent, _ := os.ReadFile("quality.yml")
 	outcome, err := attestation.Stamp(messageFile, configContent, os.Getenv(service.SkipEnvVar))
 	if err != nil {

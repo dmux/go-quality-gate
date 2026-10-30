@@ -91,3 +91,14 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 		t.Fatal("expected an error for malformed YAML")
 	}
 }
+
+func TestSettings_WatermarkDisabledByDefault(t *testing.T) {
+	cfg := &Config{}
+	if cfg.Settings.WatermarkEnabled() {
+		t.Error("watermark must be disabled unless the config opts in")
+	}
+	cfg.Settings.Watermark = true
+	if !cfg.Settings.WatermarkEnabled() {
+		t.Error("settings.watermark: true must enable the watermark")
+	}
+}

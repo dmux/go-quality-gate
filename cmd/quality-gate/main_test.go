@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -673,5 +674,91 @@ func TestRun_MCP_ValidationBlocks(t *testing.T) {
 	// the validation error must go to stderr as plain text, not JSON.
 	if !strings.Contains(stderr, "CRITICAL") {
 		t.Errorf("expected the validation error on stderr, got %q", stderr)
+	}
+}
+
+// --- watermark ---
+
+// initRealGitRepo is initGitRepo with a real repository, since attestations
+// are bound to `git write-tree`.
+func initRealGitRepo(t *testing.T) {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	if out, err := exec.Command("git", "init", "-q").CombinedOutput(); err != nil {
+		t.Skipf("git unavailable: %v: %s", err, out)
+	}
+}
+
+// commitMessageAfterPreCommit runs a passing pre-commit with the given
+// quality.yml, then the commit-msg hook, and returns the final message.
+func commitMessageAfterPreCommit(t *testing.T, qualityYML string) string {
+	t.Helper()
+	initRealGitRepo(t)
+	writeQualityYML(t, qualityYML)
+	if out, err := exec.Command("git", "add", "quality.yml").CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, out)
+	}
+
+	if code, stdout, _ := runCLI("pre-commit"); code != 0 {
+		t.Fatalf("pre-commit failed (%d): %s", code, stdout)
+	}
+
+	msgFile := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	if err := os.WriteFile(msgFile, []byte("feat: add login\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, _ := runCLI("commit-msg", msgFile); code != 0 {
+		t.Fatalf("commit-msg must never fail the commit, got exit %d", code)
+	}
+	msg, err := os.ReadFile(msgFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(msg)
+}
+
+func TestRun_Watermark_DisabledByDefault(t *testing.T) {
+	msg := commitMessageAfterPreCommit(t, simpleQualityYML)
+
+	if strings.Contains(msg, "Quality-Gate:") {
+		t.Errorf("commits must not be watermarked unless enabled, got %q", msg)
+	}
+	matches, _ := filepath.Glob(".git/quality-gate/attestation*")
+	if len(matches) != 0 {
+		t.Errorf("no attestation should be recorded when disabled, found %v", matches)
+	}
+}
+
+func TestRun_Watermark_ExplicitlyDisabled(t *testing.T) {
+	msg := commitMessageAfterPreCommit(t, "settings:\n  watermark: false\n"+simpleQualityYML)
+
+	if strings.Contains(msg, "Quality-Gate:") {
+		t.Errorf("settings.watermark: false must not watermark, got %q", msg)
+	}
+}
+
+func TestRun_Watermark_EnabledAddsTrailer(t *testing.T) {
+	msg := commitMessageAfterPreCommit(t, "settings:\n  watermark: true\n"+simpleQualityYML)
+
+	if !strings.Contains(msg, "Quality-Gate: v") {
+		t.Errorf("expected a Quality-Gate trailer when enabled, got %q", msg)
+	}
+}
+
+func TestRun_Watermark_SkipWithoutTrailerWhenDisabled(t *testing.T) {
+	initRealGitRepo(t)
+	writeQualityYML(t, simpleQualityYML)
+	t.Setenv("QG_SKIP", "hotfix")
+
+	msgFile := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	if err := os.WriteFile(msgFile, []byte("fix: urgent\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, _ := runCLI("commit-msg", msgFile); code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	msg, _ := os.ReadFile(msgFile)
+	if strings.Contains(string(msg), "Quality-Gate-Skipped") {
+		t.Errorf("the skip trailer belongs to the watermark and must be off by default, got %q", msg)
 	}
 }

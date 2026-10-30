@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** the commit watermark is now disabled by default. Repositories that rely on it (for example with `quality-gate verify` in CI) must add `settings.watermark: true` to `quality.yml`. While disabled, no attestation is recorded, `commit-msg` leaves the message untouched, `QG_SKIP` adds no trailer, and the GitHub Action skips the verify step.
+
 ## [1.4.1] - 2026-10-29
 
 ### Added

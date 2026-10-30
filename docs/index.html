@@ -697,6 +697,9 @@ td.desc{color:var(--text-muted)}
           Git hooks can be skipped with <code>--no-verify</code>. Now every commit that passed your checks is
           watermarked with a trailer bound to its exact content — and CI can refuse the ones that were not.
         </p>
+        <p style="margin-top:12px;color:var(--text-muted)">
+          Opt-in: add <code>settings.watermark: true</code> to <code>quality.yml</code> to turn it on.
+        </p>
         <ul class="checks">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>pre-commit</b> runs your checks. A failure blocks the commit; on success, the hash of the staged content and of <code>quality.yml</code> is stored.</span></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span><b>You write the message</b> — with <code>-m</code> or your editor, as usual.</span></li>
