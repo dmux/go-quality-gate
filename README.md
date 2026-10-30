@@ -71,6 +71,8 @@ sudo mv quality-gate-darwin-arm64 /usr/local/bin/quality-gate
 go install github.com/dmux/go-quality-gate/cmd/quality-gate@latest
 ```
 
+To upgrade later, run `quality-gate --update`, which runs the same `go install ...@latest` and prints the version it moved to.
+
 #### Option C: Using Docker
 
 ```bash
@@ -336,6 +338,7 @@ hooks:
 | `doctor`        | Checks hooks, quality.yml, configured tools and language runtimes | `./quality-gate doctor`         |
 | `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
+| `--update`      | Updates quality-gate to the latest version (via Go)     | `./quality-gate --update`                 |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
 | `--parallel`    | Runs independent hooks concurrently (opt-in)            | `./quality-gate --parallel pre-commit`    |
 
@@ -344,13 +347,13 @@ hooks:
 ```bash
 # Simple version
 ./quality-gate --version
-# Output: quality-gate version 1.3.0
+# Output: quality-gate version 1.4.0
 
 # JSON version with build details
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
@@ -365,7 +368,7 @@ Client-side hooks can always be bypassed (`git commit --no-verify`, deleting the
 ```
 feat: add login
 
-Quality-Gate: v1.3.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+Quality-Gate: v1.4.0; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 ```
 
 - `--no-verify` skips both hooks, so the commit has **no** trailer.
