@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dmux/go-quality-gate/internal/config"
 )
 
 type fakeHookInspector struct {
@@ -158,8 +160,8 @@ hooks: {}
 	if !ok {
 		t.Fatal("expected a 'Fake Tool tool' check")
 	}
-	if check.OK {
-		t.Error("expected tool check to fail when the binary is missing")
+	if !check.OK || !check.Warning {
+		t.Errorf("under the default install policy a missing tool is a warning, not a failure, got %+v", check)
 	}
 
 	writeFakeExecutable(t, binDir, "fake-tool-binary")
@@ -219,5 +221,55 @@ func TestDoctorService_Run_RuntimeAvailability(t *testing.T) {
 	}
 	if check.OK {
 		t.Error("expected go runtime check to fail when go is missing from PATH")
+	}
+}
+
+func TestDoctorService_Run_MissingToolFailsUnderRecommendPolicy(t *testing.T) {
+	dir := t.TempDir()
+	writeQualityYML(t, dir, `settings:
+  tools_policy: recommend
+tools:
+  - name: "Fake Tool"
+    check_command: "fake-tool-binary --version"
+    install_command: "install fake-tool-binary"
+hooks: {}
+`)
+	t.Chdir(dir)
+	t.Setenv("PATH", t.TempDir())
+
+	checks := NewDoctorService(&fakeHookInspector{dir: t.TempDir()}, "quality.yml").Run()
+
+	check, ok := findCheck(checks, "Fake Tool tool")
+	if !ok {
+		t.Fatal("expected a 'Fake Tool tool' check")
+	}
+	if check.OK || check.Warning {
+		t.Errorf("under the recommend policy a missing tool must fail, got %+v", check)
+	}
+}
+
+func TestCheckToolAvailability_LauncherCommandsAreSkipped(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	cases := []string{
+		"npx eslint --version",
+		"python3 -m ruff --version",
+		"go run github.com/x/y@latest --version",
+		"pnpm dlx prettier --version",
+	}
+	for _, cmd := range cases {
+		check := checkToolAvailability(config.Tool{Name: "T", CheckCommand: cmd}, config.ToolsPolicyInstall)
+		if !check.Skipped || !check.OK || check.Warning {
+			t.Errorf("%q should be skipped, got %+v", cmd, check)
+		}
+	}
+}
+
+func TestCheckToolAvailability_NonLauncherUseOfSameBinaryIsChecked(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	check := checkToolAvailability(config.Tool{Name: "T", CheckCommand: "go version"}, config.ToolsPolicyRecommend)
+	if check.Skipped || check.OK {
+		t.Errorf("`go version` is not a launcher call and should be looked up on PATH, got %+v", check)
 	}
 }

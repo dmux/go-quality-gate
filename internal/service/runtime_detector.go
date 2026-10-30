@@ -19,10 +19,13 @@ type RuntimeCheck struct {
 // runtimeInfo describes how to detect and, per OS, how to install a base
 // language runtime.
 type runtimeInfo struct {
-	binary      string
-	darwinHint  string
-	windowsHint string
-	linuxHints  []linuxPackageManagerHint
+	binary string
+	// windowsBinaries, when set, replaces binary on Windows, where the
+	// installers do not provide the Unix-style name (python3).
+	windowsBinaries []string
+	darwinHint      string
+	windowsHint     string
+	linuxHints      []linuxPackageManagerHint
 }
 
 // linuxPackageManagerHint maps a package manager's own binary (used to
@@ -50,9 +53,10 @@ var baseLanguageRuntimes = map[Language]runtimeInfo{
 		},
 	},
 	LanguagePython: {
-		binary:      "python3",
-		darwinHint:  "brew install python3",
-		windowsHint: "winget install -e --id Python.Python.3",
+		binary:          "python3",
+		windowsBinaries: []string{"python", "py"},
+		darwinHint:      "brew install python3",
+		windowsHint:     "winget install -e --id Python.Python.3",
 		linuxHints: []linuxPackageManagerHint{
 			{"apt-get", "sudo apt-get install -y python3"},
 			{"dnf", "sudo dnf install -y python3"},
@@ -138,16 +142,32 @@ func DetectRuntimes(structure *ProjectStructure) []RuntimeCheck {
 			continue
 		}
 
-		_, err := exec.LookPath(info.binary)
+		binary, installed := findRuntimeBinary(info, runtime.GOOS)
 		checks = append(checks, RuntimeCheck{
 			Language:    lang,
-			Binary:      info.binary,
-			Installed:   err == nil,
+			Binary:      binary,
+			Installed:   installed,
 			InstallHint: installHintForOS(info, runtime.GOOS),
 		})
 	}
 
 	return checks
+}
+
+// findRuntimeBinary looks the runtime up on PATH under the names it has on
+// goos. When none is found it returns the primary name so messages stay
+// meaningful.
+func findRuntimeBinary(info runtimeInfo, goos string) (string, bool) {
+	candidates := []string{info.binary}
+	if goos == "windows" && len(info.windowsBinaries) > 0 {
+		candidates = info.windowsBinaries
+	}
+	for _, name := range candidates {
+		if _, err := exec.LookPath(name); err == nil {
+			return name, true
+		}
+	}
+	return candidates[0], false
 }
 
 // collectBaseLanguages resolves every detected language/framework to its

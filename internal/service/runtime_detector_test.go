@@ -161,3 +161,24 @@ func TestInstallHintForOS_UnknownOS(t *testing.T) {
 		t.Fatal("expected a non-empty fallback hint for an unknown OS")
 	}
 }
+
+func TestFindRuntimeBinary_WindowsAcceptsPythonOrPy(t *testing.T) {
+	info := baseLanguageRuntimes[LanguagePython]
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+
+	if _, ok := findRuntimeBinary(info, "windows"); ok {
+		t.Fatal("expected python to be missing with an empty PATH")
+	}
+
+	writeFakeExecutable(t, binDir, "py")
+	got, ok := findRuntimeBinary(info, "windows")
+	if !ok || got != "py" {
+		t.Errorf("expected the py launcher to satisfy the Python runtime on Windows, got %q, %v", got, ok)
+	}
+
+	if _, ok := findRuntimeBinary(info, "linux"); ok {
+		t.Error("on Linux only python3 should satisfy the Python runtime")
+	}
+}

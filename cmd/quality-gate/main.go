@@ -460,6 +460,8 @@ func runDoctor(gitRepo *git.RealGitRepository, output string, stdout io.Writer) 
 			switch {
 			case c.Skipped:
 				icon = "⏭️"
+			case c.Warning:
+				icon = "⚠️"
 			case !c.OK:
 				icon = "❌"
 			}

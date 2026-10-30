@@ -14,10 +14,14 @@ import (
 // DoctorCheck is the outcome of one installation health check. Skipped marks
 // a check that could not be performed at all: it is not a failure, but
 // reporting it as a plain pass would claim verification that never happened.
+// Warning marks a check that found something missing which quality-gate will
+// fix on its own (a tool under the "install" policy): it does not make the
+// environment unhealthy, but it must not be reported as a plain pass either.
 type DoctorCheck struct {
 	Name    string `json:"name"`
 	OK      bool   `json:"ok"`
 	Skipped bool   `json:"skipped,omitempty"`
+	Warning bool   `json:"warning,omitempty"`
 	Detail  string `json:"detail,omitempty"`
 }
 
@@ -58,8 +62,9 @@ func (s *DoctorService) Run() []DoctorCheck {
 	}
 	checks = append(checks, DoctorCheck{Name: s.configPath, OK: true})
 
+	policy := cfg.Settings.InstallPolicy()
 	for _, tool := range cfg.Tools {
-		checks = append(checks, checkToolAvailability(tool))
+		checks = append(checks, checkToolAvailability(tool, policy))
 	}
 
 	// filepath.Dir("quality.yml") is ".", so resolve it to keep the reported
@@ -80,11 +85,49 @@ func (s *DoctorService) Run() []DoctorCheck {
 	return checks
 }
 
+// launcherSubcommands lists, per launcher binary, the arguments that make it
+// run some other program (npx eslint, python3 -m ruff, go run ...). "" means
+// the launcher always delegates, whatever its arguments.
+var launcherSubcommands = map[string][]string{
+	"npx":     {""},
+	"bunx":    {""},
+	"pnpx":    {""},
+	"uvx":     {""},
+	"pipx":    {"run"},
+	"python":  {"-m"},
+	"python3": {"-m"},
+	"py":      {"-m"},
+	"go":      {"run", "tool"},
+	"npm":     {"exec", "x"},
+	"pnpm":    {"exec", "dlx"},
+	"yarn":    {"exec", "dlx"},
+	"bun":     {"x"},
+	"uv":      {"run", "tool"},
+}
+
+// isLauncherCommand reports whether the command's first words only start
+// another program, so finding the first word on PATH proves nothing about
+// the tool the check_command is really about.
+func isLauncherCommand(parts []string) bool {
+	subs, ok := launcherSubcommands[parts[0]]
+	if !ok {
+		return false
+	}
+	for _, sub := range subs {
+		if sub == "" || (len(parts) > 1 && parts[1] == sub) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkToolAvailability reports whether a configured tool's binary is on
-// PATH. Commands piped/chained/qualified with a path are skipped, the same
-// exclusion config.ConfigValidator.validateToolAvailability applies, since
-// running a fragment of such a command wouldn't be a meaningful check.
-func checkToolAvailability(tool config.Tool) DoctorCheck {
+// PATH. Commands piped/chained/qualified with a path, or that go through a
+// launcher such as npx or `python3 -m`, are skipped: the first word is not
+// the tool, and running the command would execute user-defined code from a
+// read-only health check. Under the "install" policy a missing tool is only
+// a warning, since the next run installs it; under "recommend" it fails.
+func checkToolAvailability(tool config.Tool, policy string) DoctorCheck {
 	name := tool.Name + " tool"
 
 	parts := strings.Fields(tool.CheckCommand)
@@ -95,9 +138,15 @@ func checkToolAvailability(tool config.Tool) DoctorCheck {
 	if strings.ContainsAny(cmdName, "/|&") {
 		return DoctorCheck{Name: name, OK: true, Skipped: true, Detail: "not verified (complex check_command)"}
 	}
+	if isLauncherCommand(parts) {
+		return DoctorCheck{Name: name, OK: true, Skipped: true, Detail: fmt.Sprintf("not verified (check_command runs through %q)", cmdName)}
+	}
 
 	if _, err := exec.LookPath(cmdName); err != nil {
-		return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", cmdName, tool.InstallCommand)}
+		if policy == config.ToolsPolicyRecommend {
+			return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", cmdName, tool.InstallCommand)}
+		}
+		return DoctorCheck{Name: name, OK: true, Warning: true, Detail: fmt.Sprintf("%q not found in PATH; will be installed automatically on the next run (%s)", cmdName, tool.InstallCommand)}
 	}
 	return DoctorCheck{Name: name, OK: true, Detail: cmdName}
 }
