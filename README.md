@@ -127,6 +127,9 @@ git commit -m "feat: new feature"
 ## ⚙️ Configuration (quality.yml)
 
 ```yaml
+settings:
+  tools_policy: install # "install" (default) or "recommend"
+
 tools:
   - name: "Gitleaks"
     check_command: "gitleaks version"
@@ -180,6 +183,20 @@ hooks:
 > `QG_SKIP="offline" git commit …` or drop the audit commands from your
 > `quality.yml`.
 
+`settings.tools_policy` controls what happens when a configured tool is
+missing:
+
+- `install` (default): quality-gate runs the tool's `install_command`
+  automatically, same as before this setting existed.
+- `recommend`: quality-gate never installs anything on your behalf. It
+  prints the recommended install command instead and lets the hook fail
+  naturally if the tool turns out to be required — useful in locked-down
+  environments where silent installs aren't acceptable.
+
+Any other value is a configuration error that blocks execution, rather than
+falling back to `install`: if you asked for `recommend` and mistyped it,
+silently auto-installing tools would be the opposite of what you wanted.
+
 ## 📘 How to Use
 
 ### 1. Build
@@ -206,7 +223,11 @@ The program will automatically configure `pre-commit` and `pre-push` hooks.
 
 ### 4. Configuration (quality.yml)
 
-The configuration is divided into two main sections:
+The configuration is divided into three main sections:
+
+- **`settings`** (optional): Global behavior flags
+  - `tools_policy`: `install` (default, auto-installs missing tools) or
+    `recommend` (only recommends the install command, never runs it)
 
 - **`tools`**: List of tools required for the project
 
@@ -314,7 +335,7 @@ hooks:
 | `--fix`         | Executes automatic fixes                                | `./quality-gate --fix pre-commit`         |
 | `--install --global` | Gates every repository of the user (global `core.hooksPath`) | `./quality-gate --install --global` |
 | `verify`        | Verifies commit watermarks (for CI)                     | `./quality-gate verify --range origin/main..HEAD` |
-| `doctor`        | Checks hooks, binary and quality.yml are in place       | `./quality-gate doctor`                   |
+| `doctor`        | Checks hooks, quality.yml, configured tools and language runtimes | `./quality-gate doctor`         |
 | `mcp`           | Runs as an MCP server for AI integration                | `./quality-gate mcp`                      |
 | `--version, -v` | Shows version information                               | `./quality-gate --version`                |
 | `--update`      | Updates quality-gate to the latest version (via Go)     | `./quality-gate --update`                 |
@@ -455,6 +476,7 @@ To use `go-quality-gate` with Cursor or Claude, simply configure the MCP server 
 The server exposes the following MCP Tools to your AI:
 1. `run_quality_checks`: Executes linters and formatting checks, returning a parsed diagnostic for the AI.
 2. `run_auto_fix`: Allows the AI to automatically trigger the formatting fixes configured in `quality.yml`.
+3. `check_environment`: Reports whether git hooks, `quality.yml`, configured tools, and detected language runtimes are correctly installed — the same checks as `quality-gate doctor`, available to the agent directly.
 
 ## 🛠️ Development
 

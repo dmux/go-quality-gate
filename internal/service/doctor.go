@@ -3,17 +3,26 @@ package service
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/dmux/go-quality-gate/internal/config"
 	"github.com/dmux/go-quality-gate/internal/repository"
 )
 
-// DoctorCheck is the outcome of one installation health check.
+// DoctorCheck is the outcome of one installation health check. Skipped marks
+// a check that could not be performed at all: it is not a failure, but
+// reporting it as a plain pass would claim verification that never happened.
+// Warning marks a check that found something missing which quality-gate will
+// fix on its own (a tool under the "install" policy): it does not make the
+// environment unhealthy, but it must not be reported as a plain pass either.
 type DoctorCheck struct {
-	Name   string `json:"name"`
-	OK     bool   `json:"ok"`
-	Detail string `json:"detail,omitempty"`
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Skipped bool   `json:"skipped,omitempty"`
+	Warning bool   `json:"warning,omitempty"`
+	Detail  string `json:"detail,omitempty"`
 }
 
 // DoctorService reports whether quality-gate is correctly wired into the
@@ -41,7 +50,115 @@ func (s *DoctorService) Run() []DoctorCheck {
 		}
 	}
 
-	return append(checks, s.checkConfig())
+	cfg, err := config.LoadConfig(s.configPath)
+	if err != nil {
+		return append(checks, DoctorCheck{Name: s.configPath, Detail: err.Error()})
+	}
+
+	result := config.NewConfigValidator(cfg).Validate()
+	if !result.Valid {
+		checks = append(checks, DoctorCheck{Name: s.configPath, Detail: fmt.Sprintf("invalid:\n%s", result.GetFormattedErrors())})
+		return checks
+	}
+	checks = append(checks, DoctorCheck{Name: s.configPath, OK: true})
+
+	policy := cfg.Settings.InstallPolicy()
+	for _, tool := range cfg.Tools {
+		checks = append(checks, checkToolAvailability(tool, policy))
+	}
+
+	// filepath.Dir("quality.yml") is ".", so resolve it to keep the reported
+	// paths absolute and unambiguous.
+	projectDir, err := filepath.Abs(filepath.Dir(s.configPath))
+	if err != nil {
+		projectDir = filepath.Dir(s.configPath)
+	}
+	structure, err := NewLanguageDetector(projectDir).DetectProjectStructure()
+	if err != nil {
+		checks = append(checks, DoctorCheck{Name: "project runtimes", Detail: err.Error()})
+		return checks
+	}
+	for _, rc := range DetectRuntimes(structure) {
+		checks = append(checks, checkRuntimeAvailability(rc))
+	}
+
+	return checks
+}
+
+// launcherSubcommands lists, per launcher binary, the arguments that make it
+// run some other program (npx eslint, python3 -m ruff, go run ...). "" means
+// the launcher always delegates, whatever its arguments.
+var launcherSubcommands = map[string][]string{
+	"npx":     {""},
+	"bunx":    {""},
+	"pnpx":    {""},
+	"uvx":     {""},
+	"pipx":    {"run"},
+	"python":  {"-m"},
+	"python3": {"-m"},
+	"py":      {"-m"},
+	"go":      {"run", "tool"},
+	"npm":     {"exec", "x"},
+	"pnpm":    {"exec", "dlx"},
+	"yarn":    {"exec", "dlx"},
+	"bun":     {"x"},
+	"uv":      {"run", "tool"},
+}
+
+// isLauncherCommand reports whether the command's first words only start
+// another program, so finding the first word on PATH proves nothing about
+// the tool the check_command is really about.
+func isLauncherCommand(parts []string) bool {
+	subs, ok := launcherSubcommands[parts[0]]
+	if !ok {
+		return false
+	}
+	for _, sub := range subs {
+		if sub == "" || (len(parts) > 1 && parts[1] == sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// checkToolAvailability reports whether a configured tool's binary is on
+// PATH. Commands piped/chained/qualified with a path, or that go through a
+// launcher such as npx or `python3 -m`, are skipped: the first word is not
+// the tool, and running the command would execute user-defined code from a
+// read-only health check. Under the "install" policy a missing tool is only
+// a warning, since the next run installs it; under "recommend" it fails.
+func checkToolAvailability(tool config.Tool, policy string) DoctorCheck {
+	name := tool.Name + " tool"
+
+	parts := strings.Fields(tool.CheckCommand)
+	if len(parts) == 0 {
+		return DoctorCheck{Name: name, Detail: "no check_command configured"}
+	}
+	cmdName := parts[0]
+	if strings.ContainsAny(cmdName, "/|&") {
+		return DoctorCheck{Name: name, OK: true, Skipped: true, Detail: "not verified (complex check_command)"}
+	}
+	if isLauncherCommand(parts) {
+		return DoctorCheck{Name: name, OK: true, Skipped: true, Detail: fmt.Sprintf("not verified (check_command runs through %q)", cmdName)}
+	}
+
+	if _, err := exec.LookPath(cmdName); err != nil {
+		if policy == config.ToolsPolicyRecommend {
+			return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", cmdName, tool.InstallCommand)}
+		}
+		return DoctorCheck{Name: name, OK: true, Warning: true, Detail: fmt.Sprintf("%q not found in PATH; will be installed automatically on the next run (%s)", cmdName, tool.InstallCommand)}
+	}
+	return DoctorCheck{Name: name, OK: true, Detail: cmdName}
+}
+
+// checkRuntimeAvailability reports whether a detected language's base
+// runtime is on PATH, with an OS-specific install hint when it's not.
+func checkRuntimeAvailability(rc RuntimeCheck) DoctorCheck {
+	name := string(rc.Language) + " runtime"
+	if !rc.Installed {
+		return DoctorCheck{Name: name, Detail: fmt.Sprintf("%q not found in PATH; install with: %s", rc.Binary, rc.InstallHint)}
+	}
+	return DoctorCheck{Name: name, OK: true, Detail: rc.Binary}
 }
 
 func checkHook(path, hook string) DoctorCheck {
@@ -67,16 +184,4 @@ func checkHook(path, hook string) DoctorCheck {
 		return DoctorCheck{Name: name, Detail: fmt.Sprintf("runs %q, which is missing or not executable; run `quality-gate --install`", binary)}
 	}
 	return DoctorCheck{Name: name, OK: true, Detail: path}
-}
-
-func (s *DoctorService) checkConfig() DoctorCheck {
-	cfg, err := config.LoadConfig(s.configPath)
-	if err != nil {
-		return DoctorCheck{Name: s.configPath, Detail: err.Error()}
-	}
-	result := config.NewConfigValidator(cfg).Validate()
-	if !result.Valid {
-		return DoctorCheck{Name: s.configPath, Detail: fmt.Sprintf("invalid:\n%s", result.GetFormattedErrors())}
-	}
-	return DoctorCheck{Name: s.configPath, OK: true}
 }

@@ -51,6 +51,34 @@ func TestLoadConfig_FileNotFound(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_ToolsPolicyDefaultsToInstall(t *testing.T) {
+	config, err := LoadConfig("testdata/quality.yml")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if config.Settings.InstallPolicy() != ToolsPolicyInstall {
+		t.Errorf("Expected default install policy %q, got %q", ToolsPolicyInstall, config.Settings.InstallPolicy())
+	}
+}
+
+func TestLoadConfig_ToolsPolicyRecommend(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "quality.yml")
+	content := "settings:\n  tools_policy: recommend\ntools: []\nhooks: {}\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if config.Settings.InstallPolicy() != ToolsPolicyRecommend {
+		t.Errorf("Expected install policy %q, got %q", ToolsPolicyRecommend, config.Settings.InstallPolicy())
+	}
+}
+
 func TestLoadConfig_InvalidYAML(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "quality.yml")
 	if err := os.WriteFile(path, []byte("tools: [this is not: valid: yaml"), 0644); err != nil {
