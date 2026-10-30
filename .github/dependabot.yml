@@ -12,3 +12,12 @@ updates:
           web-dependencies:
               applies-to: version-updates
               patterns: ["*"]
+      ignore:
+          # Major bumps need their own review: they change what lint and the
+          # type-checker accept, and CI does not cover /web.
+          - dependency-name: typescript
+            update-types: ["version-update:semver-major"]
+          - dependency-name: eslint
+            update-types: ["version-update:semver-major"]
+          - dependency-name: "@types/node"
+            update-types: ["version-update:semver-major"]
