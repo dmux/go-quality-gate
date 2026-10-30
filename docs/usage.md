@@ -75,6 +75,8 @@ git add .
 git commit -m "feat: add login"
 ```
 
+> The watermark is **opt-in**. Add `settings:` → `watermark: true` to `quality.yml` to enable it; without it, steps 1 and 3 below only run the checks and leave the message untouched.
+
 What happens behind the scenes:
 
 1. **`pre-commit`** runs the checks from `quality.yml`.
@@ -85,7 +87,7 @@ What happens behind the scenes:
    ```
    feat: add login
 
-   Quality-Gate: v1.4.1; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+   Quality-Gate: v1.4.2; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
    ```
    You will see `🔏 Commit watermarked by quality-gate.`
 4. **The commit is created** with the watermark.

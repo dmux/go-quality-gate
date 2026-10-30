@@ -293,19 +293,28 @@ hooks:
 ```bash
 # Versão simples
 ./quality-gate --version
-# Output: quality-gate version 1.4.1
+# Output: quality-gate version 1.4.2
 
 # Versão em JSON com detalhes de build
 ./quality-gate --version --output json
 # Output:
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "build_date": "2025-10-21T16:34:44Z",
   "git_commit": "f7b01a2"
 }
 ```
 
 ## 🔏 Enforcement e Watermark nos Commits
+
+> **Opt-in.** O watermark dos commits vem **desativado por padrão**. Ative por repositório no `quality.yml`:
+>
+> ```yaml
+> settings:
+>   watermark: true
+> ```
+>
+> Enquanto desativado, nenhuma attestation é gravada, o `commit-msg` não altera a mensagem, o `QG_SKIP` pula os checks sem adicionar trailer, e a GitHub Action pula o passo `verify`. O `quality-gate verify` ainda pode ser executado manualmente.
 
 Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar o hook). Por isso o quality-gate trabalha em duas camadas:
 
@@ -314,7 +323,7 @@ Hooks no cliente sempre podem ser contornados (`git commit --no-verify`, apagar 
 ```
 feat: adiciona login
 
-Quality-Gate: v1.4.1; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+Quality-Gate: v1.4.2; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
 ```
 
 - `--no-verify` pula os dois hooks, então o commit sai **sem** trailer.
