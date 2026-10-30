@@ -239,7 +239,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
 
 	if hookType == "mcp" {
-		mcpServer := mcp.NewMCPServer(qualityGate, cfg, Version)
+		doctorService := service.NewDoctorService(gitRepo, "quality.yml")
+		mcpServer := mcp.NewMCPServer(qualityGate, cfg, doctorService, Version)
 		mcpServer.OnPass(func(hookType string, results []domain.ExecutionResult) error {
 			return recordAttestation(attestation, hookType, results)
 		})
@@ -456,7 +457,10 @@ func runDoctor(gitRepo *git.RealGitRepository, output string, stdout io.Writer) 
 	} else {
 		for _, c := range checks {
 			icon := "✅"
-			if !c.OK {
+			switch {
+			case c.Skipped:
+				icon = "⏭️"
+			case !c.OK:
 				icon = "❌"
 			}
 			if c.Detail != "" {

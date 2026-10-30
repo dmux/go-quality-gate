@@ -12,19 +12,21 @@ import (
 )
 
 type MCPServer struct {
-	qgService *service.QualityGateService
-	cfg       *config.Config
-	onPass    func(hookType string, results []domain.ExecutionResult) error
-	version   string
+	qgService     *service.QualityGateService
+	cfg           *config.Config
+	doctorService *service.DoctorService
+	onPass        func(hookType string, results []domain.ExecutionResult) error
+	version       string
 }
 
 // NewMCPServer creates an MCPServer that reports version as its protocol
 // version to MCP clients (e.g. the running binary's main.Version).
-func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config, version string) *MCPServer {
+func NewMCPServer(qgService *service.QualityGateService, cfg *config.Config, doctorService *service.DoctorService, version string) *MCPServer {
 	return &MCPServer{
-		qgService: qgService,
-		cfg:       cfg,
-		version:   version,
+		qgService:     qgService,
+		cfg:           cfg,
+		doctorService: doctorService,
+		version:       version,
 	}
 }
 
@@ -56,8 +58,13 @@ func (s *MCPServer) Start() error {
 		),
 	)
 
+	checkEnvironmentTool := mcp.NewTool("check_environment",
+		mcp.WithDescription("Check whether quality-gate's git hooks, quality.yml, configured tools, and language runtimes are correctly installed."),
+	)
+
 	mcpServer.AddTool(runQualityChecksTool, s.handleRunQualityChecks)
 	mcpServer.AddTool(runAutoFixTool, s.handleRunAutoFix)
+	mcpServer.AddTool(checkEnvironmentTool, s.handleCheckEnvironment)
 
 	return server.ServeStdio(mcpServer)
 }
@@ -129,4 +136,45 @@ func (s *MCPServer) handleRunAutoFix(ctx context.Context, request mcp.CallToolRe
 	}
 
 	return mcp.NewToolResultText("Auto-fix commands executed successfully."), nil
+}
+
+func (s *MCPServer) handleCheckEnvironment(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return mcp.NewToolResultText(formatEnvironmentReport(s.doctorService.Run())), nil
+}
+
+// formatEnvironmentReport renders doctor checks as the text an agent reads.
+func formatEnvironmentReport(checks []service.DoctorCheck) string {
+	allOK := true
+	skipped := 0
+	var textOutput string
+	for _, check := range checks {
+		status := "OK"
+		switch {
+		case check.Skipped:
+			status = "SKIP"
+			skipped++
+		case !check.OK:
+			status = "FAIL"
+			allOK = false
+		}
+
+		textOutput += fmt.Sprintf("[%s] %s", status, check.Name)
+		if check.Detail != "" {
+			textOutput += fmt.Sprintf(": %s", check.Detail)
+		}
+		textOutput += "\n"
+	}
+
+	// A skipped check must not be summarized as healthy without qualification:
+	// an agent would otherwise read "healthy" as "every tool was verified".
+	switch {
+	case !allOK:
+		textOutput = "Environment has issues.\n\n" + textOutput
+	case skipped > 0:
+		textOutput = fmt.Sprintf("Environment is healthy, but %d check(s) could not be verified.\n\n", skipped) + textOutput
+	default:
+		textOutput = "Environment is healthy.\n\n" + textOutput
+	}
+
+	return textOutput
 }

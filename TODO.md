@@ -134,6 +134,7 @@
 - [ ] Structured logging system
 - [ ] Advanced error handling
 - [ ] Complete end-to-end tests
+- [x] `doctor` and `check_environment` (MCP) report tool/runtime readiness, with an opt-in `tools_policy: recommend` setting to disable auto-install
 
 ### v2.0.x - Extensibility
 
