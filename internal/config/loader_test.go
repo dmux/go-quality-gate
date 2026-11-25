@@ -102,3 +102,31 @@ func TestSettings_WatermarkDisabledByDefault(t *testing.T) {
 		t.Error("settings.watermark: true must enable the watermark")
 	}
 }
+
+func TestLoadConfig_ScopeAndGlob(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "quality.yml")
+	content := `settings:
+  scope: all
+hooks:
+  go:
+    pre-commit:
+      - name: "Format"
+        command: "gofmt -l {files}"
+        glob: ["*.go", "cmd/**/*.go"]
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if config.Settings.DefaultScope() != ScopeAll {
+		t.Errorf("expected scope all, got %q", config.Settings.DefaultScope())
+	}
+	glob := config.Hooks["go"]["pre-commit"][0].Glob
+	if len(glob) != 2 || glob[0] != "*.go" || glob[1] != "cmd/**/*.go" {
+		t.Errorf("unexpected glob %q", glob)
+	}
+}

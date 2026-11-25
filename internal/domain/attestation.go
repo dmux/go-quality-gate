@@ -12,12 +12,15 @@ const (
 // Attestation records that the quality gates passed for a given index tree
 // and configuration.
 type Attestation struct {
-	Version   string    `json:"version"`
-	Tree      string    `json:"tree"`
-	ConfigSHA string    `json:"config_sha"`
-	Passed    int       `json:"passed"`
-	Total     int       `json:"total"`
-	At        time.Time `json:"at"`
+	Version   string `json:"version"`
+	Tree      string `json:"tree"`
+	ConfigSHA string `json:"config_sha"`
+	Passed    int    `json:"passed"`
+	// Skipped counts hooks that did not run because no changed file matched
+	// them; they are included in Total but not in Passed.
+	Skipped int       `json:"skipped,omitempty"`
+	Total   int       `json:"total"`
+	At      time.Time `json:"at"`
 }
 
 // CommitStatus is the verification outcome of a single commit.

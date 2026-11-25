@@ -17,6 +17,27 @@ type Settings struct {
 	// attested and the commit-msg hook appends a Quality-Gate trailer that
 	// `quality-gate verify` checks in CI. Disabled unless set to true.
 	Watermark bool `yaml:"watermark,omitempty"`
+
+	// Scope selects which files hooks analyze by default: "changed"
+	// (default) passes only the files changed by the commit or push to the
+	// {files} and {dirs} placeholders, "all" passes every tracked file. The
+	// --all flag and QG_SCOPE=all override it per run.
+	Scope string `yaml:"scope,omitempty"`
+}
+
+// ScopeChanged and ScopeAll are the only valid values for Settings.Scope.
+const (
+	ScopeChanged = "changed"
+	ScopeAll     = "all"
+)
+
+// DefaultScope returns the effective scope, defaulting to ScopeChanged when
+// unset.
+func (s Settings) DefaultScope() string {
+	if s.Scope == "" {
+		return ScopeChanged
+	}
+	return s.Scope
 }
 
 // ToolsPolicyInstall and ToolsPolicyRecommend are the only valid values for
@@ -52,9 +73,12 @@ type Tool struct {
 type Hooks map[string]map[string][]Hook
 
 type Hook struct {
-	Name        string      `yaml:"name"`
-	Command     string      `yaml:"command"`
-	FixCommand  string      `yaml:"fix_command,omitempty"`
+	Name       string `yaml:"name"`
+	Command    string `yaml:"command"`
+	FixCommand string `yaml:"fix_command,omitempty"`
+	// Glob limits the hook to changed files matching one of the patterns
+	// (e.g. "*.go"); the hook is skipped when none match.
+	Glob        []string    `yaml:"glob,omitempty"`
 	OutputRules OutputRules `yaml:"output_rules,omitempty"`
 }
 

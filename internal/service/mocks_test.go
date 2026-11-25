@@ -36,6 +36,7 @@ type MockHookRunner struct {
 	ReceivedHooks         []domain.Hook
 	ReceivedParallelHooks []domain.Hook
 	FixedHooks            []domain.Hook
+	LoggedResults         []domain.ExecutionResult
 }
 
 // RunHooks implements the repository.HookRunner interface.
@@ -57,6 +58,36 @@ func (m *MockHookRunner) RunFixCommand(hook domain.Hook) (string, error) {
 		return result.Output, result.Err
 	}
 	return "", nil
+}
+
+// LogResult implements the repository.HookRunner interface.
+func (m *MockHookRunner) LogResult(result domain.ExecutionResult) {
+	m.LoggedResults = append(m.LoggedResults, result)
+}
+
+// MockFileLister is a mock implementation of the repository.FileLister interface.
+type MockFileLister struct {
+	Staged, Push, Tracked []string
+	Err                   error
+	Calls                 []string
+}
+
+// StagedFiles implements the repository.FileLister interface.
+func (m *MockFileLister) StagedFiles() ([]string, error) {
+	m.Calls = append(m.Calls, "staged")
+	return m.Staged, m.Err
+}
+
+// PushFiles implements the repository.FileLister interface.
+func (m *MockFileLister) PushFiles() ([]string, error) {
+	m.Calls = append(m.Calls, "push")
+	return m.Push, m.Err
+}
+
+// TrackedFiles implements the repository.FileLister interface.
+func (m *MockFileLister) TrackedFiles() ([]string, error) {
+	m.Calls = append(m.Calls, "tracked")
+	return m.Tracked, m.Err
 }
 
 // MockLogger is a mock implementation of the Logger interface.

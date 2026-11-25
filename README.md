@@ -28,6 +28,7 @@ A code quality control tool built in Go, distributed as a single binary with no 
 - **📊 Observability**: Spinners, timing, and real-time visual feedback
 - **🔒 Built-in Security**: Secret scanning plus Python dependency vulnerability audit (pip-audit) in commit/push workflow
 - **⚡ Native Performance**: Instant execution without interpreters
+- **🎯 Incremental by Default**: Checks only the files changed by the commit or push, with `--all` for a full analysis
 - **🚀 CI/CD Ready**: Clean JSON output for automation pipelines
 - **🤖 MCP Server**: Model Context Protocol support for AI coding agents (Claude, Cursor, etc.)
 
@@ -129,6 +130,7 @@ git commit -m "feat: new feature"
 ```yaml
 settings:
   tools_policy: install # "install" (default) or "recommend"
+  scope: changed        # "changed" (default) or "all"
 
 tools:
   - name: "Gitleaks"
@@ -145,15 +147,16 @@ hooks:
   security:
     pre-commit:
       - name: "🔒 Security Check"
-        command: "gitleaks detect --no-git --source . --verbose"
+        command: "gitleaks git --pre-commit --staged --verbose"
         output_rules:
           on_failure_message: "Secret leak detected!"
 
   python-backend:
     pre-commit:
       - name: "🎨 Format Check (Ruff)"
-        command: "ruff format ./backend --check"
-        fix_command: "ruff format ./backend"
+        command: "ruff format --check {files}"
+        fix_command: "ruff format {files}"
+        glob: ["backend/**/*.py"]
         output_rules:
           show_on: failure
           on_failure_message: "Run './quality-gate --fix' to format."
@@ -174,8 +177,9 @@ hooks:
   typescript-frontend:
     pre-commit:
       - name: "🎨 Format Check (Prettier)"
-        command: "npx prettier --check 'frontend/**/*.{ts,tsx}'"
-        fix_command: "npx prettier --write 'frontend/**/*.{ts,tsx}'"
+        command: "npx prettier --check {files}"
+        fix_command: "npx prettier --write {files}"
+        glob: ["frontend/**/*.ts", "frontend/**/*.tsx"]
 ```
 
 > The `pip-audit` dependency audit runs on both `pre-commit` and `pre-push` and
@@ -196,6 +200,54 @@ missing:
 Any other value is a configuration error that blocks execution, rather than
 falling back to `install`: if you asked for `recommend` and mistyped it,
 silently auto-installing tools would be the opposite of what you wanted.
+
+### Changed files only (default) vs. full analysis
+
+By default a hook only analyzes the files changed by the commit (staged files)
+or, on `pre-push`, by the push (`@{upstream}...HEAD`; a branch without an
+upstream is checked in full). Hooks opt in through two optional fields:
+
+- `{files}` / `{dirs}` in `command` or `fix_command` are replaced by the
+  shell-quoted changed files, or by their parent directories as `./path`
+  (for package-based tools such as `go vet {dirs}`).
+- `glob` limits the hook to changed files matching one of the patterns. A
+  pattern without `/` matches the file name in any directory (`*.go`); one
+  with `/` matches the path, where `**` matches any number of directories
+  (`web/**/*.ts`). When no changed file matches, the hook is **skipped**
+  (`⏭️`) and counts as passed.
+
+```yaml
+hooks:
+  go:
+    pre-commit:
+      - name: "🎨 Format Check (gofmt)"
+        command: "gofmt -l {files}"
+        fix_command: "gofmt -w {files}"   # --fix only rewrites the changed files
+        glob: ["*.go"]
+      - name: "🧪 Tests (changed packages)"
+        command: "go test {dirs}"
+        glob: ["*.go"]
+      - name: "🔍 Lint (golangci-lint)"
+        command: "golangci-lint run --new-from-rev=HEAD ./..."  # native diff mode
+        glob: ["*.go"]
+    pre-push:
+      - name: "🧪 Tests"
+        command: "go test ./..."          # no {files} and no glob: always runs
+```
+
+Hooks without placeholders and without `glob` run exactly as before, so
+existing configurations keep working. Tools with a native diff mode do better
+with it: `gitleaks git --pre-commit --staged` scans only the staged diff.
+Whole-project tools (`cargo clippy`, `pytest`, `phpstan`) can use a `glob`
+alone to be skipped when nothing relevant changed.
+
+For a full analysis of every tracked file, use `--all`
+(`quality-gate --all pre-commit`), `QG_SCOPE=all git commit` from the git hook,
+or `settings.scope: all` to make it the default. `--output=json` reports the
+`scope` of the run and `skipped` / `skip_reason` per hook.
+
+> Tools read the working tree, not the index: a partially staged file is
+> checked with its unstaged edits included.
 
 ## 📘 How to Use
 
@@ -341,6 +393,7 @@ hooks:
 | `--update`      | Updates quality-gate to the latest version (via Go)     | `./quality-gate --update`                 |
 | `--output=json` | Structured output for CI/CD                             | `./quality-gate --output=json pre-commit` |
 | `--parallel`    | Runs independent hooks concurrently (opt-in)            | `./quality-gate --parallel pre-commit`    |
+| `--all`         | Analyzes every tracked file, not only the changed ones  | `./quality-gate --all pre-commit`         |
 
 ### 📊 Version Information
 
@@ -449,16 +502,29 @@ The `commit-msg` hook never blocks a commit; enforcement happens in CI.
 ```json
 {
   "status": "success",
+  "scope": "changed",
   "results": [
     {
       "hook": {
         "Name": "🔒 Security Check",
-        "Command": "gitleaks detect --source ."
+        "Command": "gitleaks git --pre-commit --staged"
       },
       "success": true,
       "output": "",
       "duration_ms": 150,
       "duration": "150ms"
+    },
+    {
+      "hook": {
+        "Name": "🎨 Format Check (Ruff)",
+        "Command": "ruff format --check {files}"
+      },
+      "success": true,
+      "output": "",
+      "duration_ms": 0,
+      "duration": "0s",
+      "skipped": true,
+      "skip_reason": "no matching changed files"
     }
   ]
 }

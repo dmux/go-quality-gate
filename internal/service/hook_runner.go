@@ -70,11 +70,20 @@ func (s *HookRunnerService) RunHooks(hooks []domain.Hook) []domain.ExecutionResu
 	return results
 }
 
+// LogResult implements the repository.HookRunner interface.
+func (s *HookRunnerService) LogResult(result domain.ExecutionResult) {
+	s.logResult(result)
+}
+
 // logResult logs the pass/fail outcome for one hook, honoring OutputRules.
 // Must only be called from the calling goroutine, never from a worker
 // goroutine — StartSpinner/StopSpinner/Print/Println are not goroutine-safe
 // (see internal/infra/spinner/spinner.go: isActive/spinner fields have no lock).
 func (s *HookRunnerService) logResult(result domain.ExecutionResult) {
+	if result.Skipped {
+		s.logger.Print("⏭️  %s skipped (%s)\n", result.Hook.Name, result.SkipReason)
+		return
+	}
 	if !result.Success {
 		s.logger.Print("❌ %s failed (%v)\n", result.Hook.Name, result.Duration.Round(time.Millisecond))
 		if result.Hook.OutputRules.OnFailureMessage != "" {

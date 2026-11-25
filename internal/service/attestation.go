@@ -52,9 +52,13 @@ func HashConfig(content []byte) string {
 // Record stores an attestation bound to the current index tree. It is only
 // written when every result succeeded.
 func (s *AttestationService) Record(results []domain.ExecutionResult, config []byte) error {
+	skipped := 0
 	for _, result := range results {
 		if !result.Success {
 			return fmt.Errorf("refusing to attest a failed run")
+		}
+		if result.Skipped {
+			skipped++
 		}
 	}
 
@@ -67,7 +71,8 @@ func (s *AttestationService) Record(results []domain.ExecutionResult, config []b
 		Version:   s.version,
 		Tree:      tree,
 		ConfigSHA: HashConfig(config),
-		Passed:    len(results),
+		Passed:    len(results) - skipped,
+		Skipped:   skipped,
 		Total:     len(results),
 		At:        s.now().UTC(),
 	})
@@ -200,9 +205,15 @@ func (s *AttestationService) checkAttestation(commit, configPath, value string, 
 }
 
 // FormatTrailer renders the watermark trailer for an attestation.
+// Hooks skipped by a changed-files run are listed separately so checks=N/M
+// never reads as a failure.
 func FormatTrailer(a domain.Attestation) string {
-	return fmt.Sprintf("%s: v%s; tree=%s; config=%s; checks=%d/%d",
+	trailer := fmt.Sprintf("%s: v%s; tree=%s; config=%s; checks=%d/%d",
 		domain.AttestationTrailer, strings.TrimPrefix(a.Version, "v"), a.Tree, a.ConfigSHA, a.Passed, a.Total)
+	if a.Skipped > 0 {
+		trailer += fmt.Sprintf("; skipped=%d", a.Skipped)
+	}
+	return trailer
 }
 
 // ParseTrailer parses the value of a Quality-Gate trailer.
@@ -225,6 +236,8 @@ func ParseTrailer(value string) (domain.Attestation, error) {
 			passed, total, _ := strings.Cut(val, "/")
 			a.Passed, _ = strconv.Atoi(passed)
 			a.Total, _ = strconv.Atoi(total)
+		case "skipped":
+			a.Skipped, _ = strconv.Atoi(val)
 		}
 	}
 

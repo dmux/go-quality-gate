@@ -60,6 +60,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	parallelFlag := fs.Bool("parallel", false, "Run independent hooks concurrently")
 	portFlag := fs.Int("port", 4173, "Port for the 'ui' web dashboard")
 	globalFlag := fs.Bool("global", false, "With --install, install hooks for every repository of this user")
+	allFlag := fs.Bool("all", false, "Analyze every tracked file instead of only the changed ones")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -190,6 +191,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		logPrintln("  --update Update quality-gate to the latest version")
 		logPrintln("  --output json Output results in JSON format")
 		logPrintln("  --parallel    Run independent hooks concurrently")
+		logPrintln("  --all         Analyze every tracked file, not only the changed ones")
 		logPrintln("  --port N      Port for 'ui' web dashboard (default 4173)")
 		logPrintln("")
 		logPrintln("Examples:")
@@ -197,6 +199,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		logPrintln("  quality-gate --install           # Install git hooks")
 		logPrintln("  quality-gate pre-commit          # Run pre-commit checks")
 		logPrintln("  quality-gate --fix pre-commit    # Fix issues and run checks")
+		logPrintln("  quality-gate --all pre-commit    # Check every file, not only the changed ones")
+		logPrintln("  QG_SCOPE=all git commit          # Full analysis from the git hook")
 		logPrintln("  quality-gate verify --range origin/main..HEAD  # Check watermarks")
 		logPrintln("  QG_SKIP=\"reason\" git commit      # Skip checks, leaving an audit trailer")
 		logPrintln("  quality-gate --version           # Show version")
@@ -284,7 +288,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	gitRepo := &git.RealGitRepository{}
 	toolManager := service.NewCachingToolManagerService(shellRunner, consoleLogger, gitRepo)
 	hookRunner := service.NewHookRunnerService(shellRunner, consoleLogger)
-	qualityGate := service.NewQualityGateService(toolManager, hookRunner)
+	qualityGate := service.NewQualityGateService(toolManager, hookRunner).WithFileLister(gitRepo)
+	scope := effectiveScope(cfg, *allFlag)
 
 	if hookType == "mcp" {
 		doctorService := service.NewDoctorService(gitRepo, "quality.yml")
@@ -301,7 +306,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	if *fixFlag {
 		logPrintln("Fixing fixable issues...")
-		err = qualityGate.Fix(cfg, hookType)
+		err = qualityGate.Fix(cfg, hookType, scope)
 		if err != nil {
 			logPrint("Error fixing issues: %v\n", err)
 			return 1
@@ -311,8 +316,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	if summary, ok := qualityGate.DescribeScope(cfg, hookType, scope); ok {
+		logPrint("🔎 Scope: %s\n", summary)
+	}
+
 	runStart := time.Now()
-	results, err := qualityGate.Run(cfg, hookType, *parallelFlag)
+	results, err := qualityGate.Run(cfg, hookType, service.RunOptions{Parallel: *parallelFlag, Scope: scope})
 	recordRunHistory(hookType, results, err == nil, time.Since(runStart))
 
 	overallStatus := "success"
@@ -338,6 +347,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			Output       string      `json:"output"`
 			DurationMs   int64       `json:"duration_ms"`
 			DurationText string      `json:"duration"`
+			Skipped      bool        `json:"skipped,omitempty"`
+			SkipReason   string      `json:"skip_reason,omitempty"`
 		}
 
 		var jsonResults []JSONResult
@@ -348,14 +359,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 				Output:       result.Output,
 				DurationMs:   result.Duration.Milliseconds(),
 				DurationText: result.Duration.Round(time.Millisecond).String(),
+				Skipped:      result.Skipped,
+				SkipReason:   result.SkipReason,
 			})
 		}
 
 		jsonOutput := struct {
 			Status  string       `json:"status"`
+			Scope   domain.Scope `json:"scope"`
 			Results []JSONResult `json:"results"`
 		}{
 			Status:  overallStatus,
+			Scope:   scope,
 			Results: jsonResults,
 		}
 		jsonBytes, marshalErr := marshalJSONIndent(jsonOutput, "", "  ")
@@ -374,6 +389,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 	// text-mode failure already returned above.
 	logPrintln("Quality gate passed successfully.")
 	return 0
+}
+
+// effectiveScope resolves the scope of a run: --all wins, then QG_SCOPE=all
+// (usable from the git hook, which takes no flags), then settings.scope.
+func effectiveScope(cfg *config.Config, all bool) domain.Scope {
+	if all || os.Getenv(service.ScopeEnvVar) == string(domain.ScopeAll) {
+		return domain.ScopeAll
+	}
+	if env := os.Getenv(service.ScopeEnvVar); env == string(domain.ScopeChanged) {
+		return domain.ScopeChanged
+	}
+	return domain.Scope(cfg.Settings.DefaultScope())
 }
 
 // watermarkEnabled reports whether quality.yml opts in to commit watermarks.
