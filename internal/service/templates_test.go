@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -370,12 +371,60 @@ func TestFormatHooksSection_EmitsGlob(t *testing.T) {
 	out := g.formatHooksSection([]HookTemplate{g.generateGoHooks()})
 
 	for _, want := range []string{
-		`command: "gofmt -l {files}"`,
+		`command: "out=$(gofmt -l {files}) || exit 1; test -z \"$out\" || { echo \"$out\"; exit 1; }"`,
 		`glob: ["*.go"]`,
 		"    pre-push:\n      - name: \"🧪 Tests\"\n        command: \"go test ./...\"",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestFormatHooksSection_EscapesQuotesAndBackslashes(t *testing.T) {
+	g := NewTemplateGenerator()
+	command := `test -z "$(echo a\\b)"`
+	out := g.formatHooksSection([]HookTemplate{{
+		Name:     "g",
+		Commands: []CommandTemplate{{Name: `say "hi"`, Command: command, OutputRules: map[string]string{"on_failure_message": `run "fix"`}}},
+	}})
+
+	var parsed config.Hooks
+	if err := yaml.Unmarshal([]byte(strings.TrimPrefix(out, "hooks:\n")), &parsed); err != nil {
+		t.Fatalf("generated YAML does not parse: %v\n%s", err, out)
+	}
+	hook := parsed["g"]["pre-commit"][0]
+	if hook.Command != command || hook.Name != `say "hi"` || hook.OutputRules.OnFailureMessage != `run "fix"` {
+		t.Errorf("round trip changed the values: %+v", hook)
+	}
+}
+
+// TestGoFormatCheck_FailsOnUnformattedFile runs the generated gofmt check
+// for real: gofmt -l exits 0 even when it lists files, so the template
+// must turn a non-empty listing into a failure.
+func TestGoFormatCheck_FailsOnUnformattedFile(t *testing.T) {
+	if _, err := exec.LookPath("gofmt"); err != nil {
+		t.Skip("gofmt not installed")
+	}
+	dir := t.TempDir()
+	t.Chdir(dir)
+	write := func(name, content string) {
+		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("good.go", "package a\n\nfunc Y() {}\n")
+	write("bad.go", "package a\nfunc  X( ){}\n")
+	write("broken.go", "package a\nfunc {\n")
+
+	check := NewTemplateGenerator().generateGoHooks().Commands[0].Command
+	for file, wantFail := range map[string]bool{"good.go": false, "bad.go": true, "broken.go": true} {
+		out, err := exec.Command("sh", "-c", expandCommand(check, []string{file})).CombinedOutput()
+		if failed := err != nil; failed != wantFail {
+			t.Errorf("%s: failed=%v, want %v (output %q)", file, failed, wantFail, out)
+		}
+		if file == "bad.go" && !strings.Contains(string(out), "bad.go") {
+			t.Errorf("expected the unformatted file to be listed, got %q", out)
 		}
 	}
 }
