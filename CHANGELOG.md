@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [1.4.3] - 2026-11-24
 
 ### Added
 
@@ -13,6 +13,15 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - `--init` templates now check only changed files (`gofmt -l {files}`, `ruff check {files}`, `npx prettier --check {files}`, `go test {dirs}`…), use `gitleaks git --pre-commit --staged` and `golangci-lint run --new-from-rev=HEAD`, and run `go test ./...` on pre-push.
+- The embedded `ui` dashboard is rebuilt with the updated web dependencies; it had shipped the original Next.js runtime since it was added.
+- Dependabot now opens its PRs against `develop` and also covers Go modules and GitHub Actions; `build-test.yml` uses Go 1.25 like the other workflows.
+
+### Dependencies
+
+- `github.com/mark3labs/mcp-go` v0.56.0 → v1.6.0 (no API changes needed).
+- `golang.org/x/term` v0.1.0 → v0.45.0, `golang.org/x/sys` v0.5.0 → v0.47.0, `golang.org/x/text` v0.14.0 → v0.41.0 — the last releases that support Go 1.25, so the minimum Go version stays 1.25.5.
+- `fatih/color` 1.19.0, `mattn/go-colorable` 0.1.16, `mattn/go-isatty` 0.0.24, `spf13/cast` 1.10.0, `google/jsonschema-go` 0.4.3, `santhosh-tekuri/jsonschema/v6` 6.0.3.
+- Web dashboard: `next` 16.4.6 (fixes the open Next.js security advisories), `@testing-library/jest-dom` 8, `jsdom` 31, `vite` 8.3.8, `vitest` 5.1.1, `recharts` 3.11, `lucide-react` 1.77 and others.
 
 ## [1.4.2] - 2026-10-29
 
