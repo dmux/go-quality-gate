@@ -328,8 +328,10 @@ func (g *TemplateGenerator) generateGoHooks() HookTemplate {
 		Description: "Quality checks for Go projects",
 		Commands: []CommandTemplate{
 			{
-				Name:       "🎨 Format Check (gofmt)",
-				Command:    "gofmt -l {files}",
+				Name: "🎨 Format Check (gofmt)",
+				// gofmt -l exits 0 even when it lists files, so fail
+				// explicitly when its output is not empty.
+				Command:    `out=$(gofmt -l {files}) || exit 1; test -z "$out" || { echo "$out"; exit 1; }`,
 				FixCommand: "gofmt -w {files}",
 				Glob:       []string{"*.go"},
 				OutputRules: map[string]string{
@@ -611,9 +613,9 @@ func (g *TemplateGenerator) formatToolsSection(tools []ToolTemplate) string {
 	lines = append(lines, "tools:")
 
 	for _, tool := range tools {
-		lines = append(lines, fmt.Sprintf("  - name: \"%s\"", tool.Name))
-		lines = append(lines, fmt.Sprintf("    check_command: \"%s\"", tool.CheckCommand))
-		lines = append(lines, fmt.Sprintf("    install_command: \"%s\"", tool.InstallCommand))
+		lines = append(lines, fmt.Sprintf("  - name: %s", yamlQuote(tool.Name)))
+		lines = append(lines, fmt.Sprintf("    check_command: %s", yamlQuote(tool.CheckCommand)))
+		lines = append(lines, fmt.Sprintf("    install_command: %s", yamlQuote(tool.InstallCommand)))
 		lines = append(lines, "")
 	}
 
@@ -647,17 +649,17 @@ func (g *TemplateGenerator) formatHooksSection(hooks []HookTemplate) string {
 			lines = append(lines, fmt.Sprintf("    %s:", hookType))
 
 			for _, cmd := range byType[hookType] {
-				lines = append(lines, fmt.Sprintf("      - name: \"%s\"", cmd.Name))
-				lines = append(lines, fmt.Sprintf("        command: \"%s\"", cmd.Command))
+				lines = append(lines, fmt.Sprintf("      - name: %s", yamlQuote(cmd.Name)))
+				lines = append(lines, fmt.Sprintf("        command: %s", yamlQuote(cmd.Command)))
 
 				if cmd.FixCommand != "" {
-					lines = append(lines, fmt.Sprintf("        fix_command: \"%s\"", cmd.FixCommand))
+					lines = append(lines, fmt.Sprintf("        fix_command: %s", yamlQuote(cmd.FixCommand)))
 				}
 
 				if len(cmd.Glob) > 0 {
 					quoted := make([]string, len(cmd.Glob))
 					for i, pattern := range cmd.Glob {
-						quoted[i] = fmt.Sprintf("\"%s\"", pattern)
+						quoted[i] = yamlQuote(pattern)
 					}
 					lines = append(lines, fmt.Sprintf("        glob: [%s]", strings.Join(quoted, ", ")))
 				}
@@ -665,7 +667,7 @@ func (g *TemplateGenerator) formatHooksSection(hooks []HookTemplate) string {
 				if len(cmd.OutputRules) > 0 {
 					lines = append(lines, "        output_rules:")
 					for key, value := range cmd.OutputRules {
-						lines = append(lines, fmt.Sprintf("          %s: \"%s\"", key, value))
+						lines = append(lines, fmt.Sprintf("          %s: %s", key, yamlQuote(value)))
 					}
 				}
 
@@ -675,6 +677,12 @@ func (g *TemplateGenerator) formatHooksSection(hooks []HookTemplate) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// yamlQuote renders s as a double-quoted YAML scalar, escaping the
+// backslashes and double quotes a shell command may contain.
+func yamlQuote(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
 }
 
 // commandHookTypes returns the hook sections a command is emitted under,

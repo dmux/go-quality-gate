@@ -221,7 +221,7 @@ hooks:
   go:
     pre-commit:
       - name: "🎨 Format Check (gofmt)"
-        command: "gofmt -l {files}"
+        command: 'out=$(gofmt -l {files}) || exit 1; test -z "$out" || { echo "$out"; exit 1; }'  # gofmt -l exits 0 even when it lists files
         fix_command: "gofmt -w {files}"   # --fix only rewrites the changed files
         glob: ["*.go"]
       - name: "🧪 Tests (changed packages)"
