@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/briandowns/spinner v1.23.2
-	github.com/mark3labs/mcp-go v0.56.0
+	github.com/mark3labs/mcp-go v1.6.0
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )
