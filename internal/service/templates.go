@@ -33,6 +33,7 @@ type CommandTemplate struct {
 	Name             string            `yaml:"name"`
 	Command          string            `yaml:"command"`
 	FixCommand       string            `yaml:"fix_command,omitempty"`
+	Glob             []string          `yaml:"glob,omitempty"`
 	OutputRules      map[string]string `yaml:"output_rules,omitempty"`
 	WorkingDirectory string            `yaml:"working_directory,omitempty"`
 	RequiredFiles    []string          `yaml:"required_files,omitempty"`
@@ -63,8 +64,9 @@ func NewTemplateGeneratorWithRoot(projectPath string) *TemplateGenerator {
 
 // GenerateTemplate creates a quality.yml template based on project structure
 func (g *TemplateGenerator) GenerateTemplate(structure *ProjectStructure) string {
-	// Commit watermarks are opt-in, so the template only documents the switch.
-	sections := []string{"# settings:\n#   watermark: true   # append a Quality-Gate trailer to commits that pass the checks (verify with `quality-gate verify`)"}
+	// Commit watermarks and full-scope runs are opt-in, so the template only
+	// documents the switches.
+	sections := []string{"# settings:\n#   watermark: true   # append a Quality-Gate trailer to commits that pass the checks (verify with `quality-gate verify`)\n#   scope: all        # check every tracked file instead of only the changed ones (one run: --all or QG_SCOPE=all)"}
 
 	// Generate tools section
 	tools := g.generateTools(structure)
@@ -278,7 +280,7 @@ func (g *TemplateGenerator) generateSecurityHooks() HookTemplate {
 		Commands: []CommandTemplate{
 			{
 				Name:    "🔒 Secret Detection (Gitleaks)",
-				Command: "gitleaks detect --no-git --source . --verbose",
+				Command: "gitleaks git --pre-commit --staged --verbose",
 				OutputRules: map[string]string{
 					"on_failure_message": "⚠️  Secret leak detected! Review your code before committing.",
 				},
@@ -327,8 +329,9 @@ func (g *TemplateGenerator) generateGoHooks() HookTemplate {
 		Commands: []CommandTemplate{
 			{
 				Name:       "🎨 Format Check (gofmt)",
-				Command:    "gofmt -l .",
-				FixCommand: "gofmt -w .",
+				Command:    "gofmt -l {files}",
+				FixCommand: "gofmt -w {files}",
+				Glob:       []string{"*.go"},
 				OutputRules: map[string]string{
 					"show_on":            "failure",
 					"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -336,14 +339,24 @@ func (g *TemplateGenerator) generateGoHooks() HookTemplate {
 			},
 			{
 				Name:    "🔍 Lint (golangci-lint)",
-				Command: "golangci-lint run ./...",
+				Command: "golangci-lint run --new-from-rev=HEAD ./...",
+				Glob:    []string{"*.go"},
 				OutputRules: map[string]string{
 					"show_on": "failure",
 				},
 			},
 			{
-				Name:    "🧪 Tests",
-				Command: "go test ./...",
+				Name:    "🧪 Tests (changed packages)",
+				Command: "go test {dirs}",
+				Glob:    []string{"*.go"},
+				OutputRules: map[string]string{
+					"show_on": "failure",
+				},
+			},
+			{
+				Name:      "🧪 Tests",
+				Command:   "go test ./...",
+				HookTypes: []string{"pre-push"},
 				OutputRules: map[string]string{
 					"show_on": "always",
 				},
@@ -354,22 +367,6 @@ func (g *TemplateGenerator) generateGoHooks() HookTemplate {
 
 func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) HookTemplate {
 	commands := []CommandTemplate{}
-
-	// Check for specific directories
-	pythonDirs := []string{".", "src", "app", "backend"}
-	for dir := range structure.Structure {
-		if strings.Contains(dir, "python") {
-			pythonDirs = append(pythonDirs, dir)
-		}
-	}
-
-	// Use the first existing directory or default to "."
-	targetDir := "."
-	for _, dir := range pythonDirs {
-		// In a real implementation, you'd check if the directory exists
-		targetDir = dir
-		break
-	}
 
 	auditSource := g.detectPythonAuditSource(structure)
 	auditCommand := "pip-audit"
@@ -383,8 +380,9 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 	commands = append(commands,
 		CommandTemplate{
 			Name:       "🎨 Format Check (Ruff)",
-			Command:    fmt.Sprintf("ruff format %s --check", targetDir),
-			FixCommand: fmt.Sprintf("ruff format %s", targetDir),
+			Command:    "ruff format --check {files}",
+			FixCommand: "ruff format {files}",
+			Glob:       []string{"*.py"},
 			OutputRules: map[string]string{
 				"show_on":            "failure",
 				"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -392,8 +390,9 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 		},
 		CommandTemplate{
 			Name:       "🔍 Lint (Ruff)",
-			Command:    fmt.Sprintf("ruff check %s", targetDir),
-			FixCommand: fmt.Sprintf("ruff check %s --fix", targetDir),
+			Command:    "ruff check {files}",
+			FixCommand: "ruff check --fix {files}",
+			Glob:       []string{"*.py"},
 			OutputRules: map[string]string{
 				"show_on":            "failure",
 				"on_failure_message": "Lint issues detected. Run './quality-gate --fix' to apply autofixes.",
@@ -402,6 +401,7 @@ func (g *TemplateGenerator) generatePythonHooks(structure *ProjectStructure) Hoo
 		CommandTemplate{
 			Name:    "🧪 Tests (pytest)",
 			Command: "pytest",
+			Glob:    []string{"*.py"},
 			OutputRules: map[string]string{
 				"show_on": "always",
 			},
@@ -429,21 +429,20 @@ func (g *TemplateGenerator) generateNodeHooks(structure *ProjectStructure) HookT
 	commands := []CommandTemplate{}
 
 	// Determine file patterns based on detected languages
-	patterns := []string{"'**/*.js'"}
+	globs := []string{"*.js"}
 	if g.hasLanguage(LanguageTypeScript, structure.Languages) {
-		patterns = append(patterns, "'**/*.ts'", "'**/*.tsx'")
+		globs = append(globs, "*.ts", "*.tsx")
 	}
 	if g.hasFramework(LanguageReact, structure.Frameworks) {
-		patterns = append(patterns, "'**/*.jsx'")
+		globs = append(globs, "*.jsx")
 	}
-
-	patternStr := strings.Join(patterns, " ")
 
 	commands = append(commands,
 		CommandTemplate{
 			Name:       "🎨 Format Check (Prettier)",
-			Command:    fmt.Sprintf("npx prettier --check %s", patternStr),
-			FixCommand: fmt.Sprintf("npx prettier --write %s", patternStr),
+			Command:    "npx prettier --check {files}",
+			FixCommand: "npx prettier --write {files}",
+			Glob:       globs,
 			OutputRules: map[string]string{
 				"show_on":            "failure",
 				"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -451,7 +450,8 @@ func (g *TemplateGenerator) generateNodeHooks(structure *ProjectStructure) HookT
 		},
 		CommandTemplate{
 			Name:    "🔍 Lint (ESLint)",
-			Command: fmt.Sprintf("npx eslint %s", patternStr),
+			Command: "npx eslint {files}",
+			Glob:    globs,
 			OutputRules: map[string]string{
 				"show_on": "failure",
 			},
@@ -459,6 +459,7 @@ func (g *TemplateGenerator) generateNodeHooks(structure *ProjectStructure) HookT
 		CommandTemplate{
 			Name:    "🧪 Tests",
 			Command: "npm test",
+			Glob:    globs,
 			OutputRules: map[string]string{
 				"show_on": "always",
 			},
@@ -481,6 +482,7 @@ func (g *TemplateGenerator) generateRustHooks() HookTemplate {
 				Name:       "🎨 Format Check (rustfmt)",
 				Command:    "cargo fmt -- --check",
 				FixCommand: "cargo fmt",
+				Glob:       []string{"*.rs"},
 				OutputRules: map[string]string{
 					"show_on":            "failure",
 					"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -489,6 +491,7 @@ func (g *TemplateGenerator) generateRustHooks() HookTemplate {
 			{
 				Name:    "🔍 Lint (Clippy)",
 				Command: "cargo clippy -- -D warnings",
+				Glob:    []string{"*.rs"},
 				OutputRules: map[string]string{
 					"show_on": "failure",
 				},
@@ -496,6 +499,7 @@ func (g *TemplateGenerator) generateRustHooks() HookTemplate {
 			{
 				Name:    "🧪 Tests",
 				Command: "cargo test",
+				Glob:    []string{"*.rs"},
 				OutputRules: map[string]string{
 					"show_on": "always",
 				},
@@ -511,8 +515,9 @@ func (g *TemplateGenerator) generatePHPHooks(structure *ProjectStructure) HookTe
 		Commands: []CommandTemplate{
 			{
 				Name:       "🎨 Format Check (PHP CS Fixer)",
-				Command:    "php-cs-fixer fix --dry-run --diff",
-				FixCommand: "php-cs-fixer fix",
+				Command:    "php-cs-fixer fix --dry-run --diff --path-mode=intersection {files}",
+				FixCommand: "php-cs-fixer fix --path-mode=intersection {files}",
+				Glob:       []string{"*.php"},
 				OutputRules: map[string]string{
 					"show_on":            "failure",
 					"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -521,6 +526,7 @@ func (g *TemplateGenerator) generatePHPHooks(structure *ProjectStructure) HookTe
 			{
 				Name:    "🔍 Static Analysis (PHPStan)",
 				Command: "phpstan analyse",
+				Glob:    []string{"*.php"},
 				OutputRules: map[string]string{
 					"show_on": "failure",
 				},
@@ -528,6 +534,7 @@ func (g *TemplateGenerator) generatePHPHooks(structure *ProjectStructure) HookTe
 			{
 				Name:    "🧪 Tests (PHPUnit)",
 				Command: "phpunit",
+				Glob:    []string{"*.php"},
 				OutputRules: map[string]string{
 					"show_on": "always",
 				},
@@ -544,7 +551,8 @@ func (g *TemplateGenerator) generateReactHooks() HookTemplate {
 		Commands: []CommandTemplate{
 			{
 				Name:    "⚛️ React Lint",
-				Command: "npx eslint --ext .jsx,.tsx .",
+				Command: "npx eslint {files}",
+				Glob:    []string{"*.jsx", "*.tsx"},
 				OutputRules: map[string]string{
 					"show_on": "failure",
 				},
@@ -561,6 +569,7 @@ func (g *TemplateGenerator) generateDjangoHooks() HookTemplate {
 			{
 				Name:    "🔍 Django Check",
 				Command: "python manage.py check",
+				Glob:    []string{"*.py"},
 				OutputRules: map[string]string{
 					"show_on": "always",
 				},
@@ -568,6 +577,7 @@ func (g *TemplateGenerator) generateDjangoHooks() HookTemplate {
 			{
 				Name:    "🗄️ Migration Check",
 				Command: "python manage.py makemigrations --dry-run --check",
+				Glob:    []string{"*.py"},
 				OutputRules: map[string]string{
 					"show_on": "failure",
 				},
@@ -583,8 +593,9 @@ func (g *TemplateGenerator) generateLaravelHooks() HookTemplate {
 		Commands: []CommandTemplate{
 			{
 				Name:       "🎨 Format Check (Laravel Pint)",
-				Command:    "pint --test",
-				FixCommand: "pint",
+				Command:    "pint --test {files}",
+				FixCommand: "pint {files}",
+				Glob:       []string{"*.php"},
 				OutputRules: map[string]string{
 					"show_on":            "failure",
 					"on_failure_message": "Code formatting issues detected. Run './quality-gate --fix' to format.",
@@ -641,6 +652,14 @@ func (g *TemplateGenerator) formatHooksSection(hooks []HookTemplate) string {
 
 				if cmd.FixCommand != "" {
 					lines = append(lines, fmt.Sprintf("        fix_command: \"%s\"", cmd.FixCommand))
+				}
+
+				if len(cmd.Glob) > 0 {
+					quoted := make([]string, len(cmd.Glob))
+					for i, pattern := range cmd.Glob {
+						quoted[i] = fmt.Sprintf("\"%s\"", pattern)
+					}
+					lines = append(lines, fmt.Sprintf("        glob: [%s]", strings.Join(quoted, ", ")))
 				}
 
 				if len(cmd.OutputRules) > 0 {

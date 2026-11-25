@@ -49,6 +49,7 @@ func (s *MCPServer) Start() error {
 			mcp.Required(),
 			mcp.Description("The type of hook to run (e.g., 'pre-commit', 'pre-push')."),
 		),
+		scopeArgument(),
 	)
 
 	runAutoFixTool := mcp.NewTool("run_auto_fix",
@@ -57,6 +58,7 @@ func (s *MCPServer) Start() error {
 			mcp.Required(),
 			mcp.Description("The type of hook to fix (e.g., 'pre-commit', 'pre-push')."),
 		),
+		scopeArgument(),
 	)
 
 	checkEnvironmentTool := mcp.NewTool("check_environment",
@@ -70,6 +72,29 @@ func (s *MCPServer) Start() error {
 	return server.ServeStdio(mcpServer)
 }
 
+// scopeArgument is the optional scope parameter shared by the run and fix
+// tools.
+func scopeArgument() mcp.ToolOption {
+	return mcp.WithString("scope",
+		mcp.Description("Which files to analyze: 'changed' (default) for the files changed by the commit or push, 'all' for every tracked file."),
+		mcp.Enum(string(domain.ScopeChanged), string(domain.ScopeAll)),
+	)
+}
+
+// parseScope reads the optional scope argument, defaulting to the scope
+// configured in quality.yml.
+func (s *MCPServer) parseScope(args map[string]interface{}) (domain.Scope, error) {
+	raw, present := args["scope"]
+	if !present || raw == nil || raw == "" {
+		return domain.Scope(s.cfg.Settings.DefaultScope()), nil
+	}
+	scope, ok := raw.(string)
+	if !ok || (scope != string(domain.ScopeChanged) && scope != string(domain.ScopeAll)) {
+		return "", fmt.Errorf("scope must be 'changed' or 'all'")
+	}
+	return domain.Scope(scope), nil
+}
+
 func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
@@ -80,7 +105,12 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultError("hookType must be a string"), nil
 	}
 
-	results, err := s.qgService.Run(s.cfg, hookType, false)
+	scope, err := s.parseScope(args)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	results, err := s.qgService.Run(s.cfg, hookType, service.RunOptions{Scope: scope})
 
 	// Create a text result with details of each check
 	var textOutput string
@@ -88,6 +118,10 @@ func (s *MCPServer) handleRunQualityChecks(ctx context.Context, request mcp.Call
 
 	for _, result := range results {
 		status := "SUCCESS"
+		if result.Skipped {
+			textOutput += fmt.Sprintf("Hook: %s\nStatus: SKIPPED (%s)\n\n", result.Hook.Name, result.SkipReason)
+			continue
+		}
 		if !result.Success {
 			status = "FAILURE"
 			overallSuccess = false
@@ -131,7 +165,12 @@ func (s *MCPServer) handleRunAutoFix(ctx context.Context, request mcp.CallToolRe
 		return mcp.NewToolResultError("hookType must be a string"), nil
 	}
 
-	err := s.qgService.Fix(s.cfg, hookType)
+	scope, err := s.parseScope(args)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	err = s.qgService.Fix(s.cfg, hookType, scope)
 	if err != nil {
 		return mcp.NewToolResultText(fmt.Sprintf("Auto-fix encountered an error: %v", err)), nil
 	}

@@ -6,6 +6,7 @@ type Hook struct {
 	Name        string
 	Command     string
 	FixCommand  string
+	Glob        []string
 	OutputRules OutputRules
 }
 

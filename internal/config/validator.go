@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -95,6 +96,16 @@ func (v *ConfigValidator) Validate() *ValidationResult {
 
 // validateSettings validates the optional settings section of the configuration
 func (v *ConfigValidator) validateSettings(result *ValidationResult) {
+	if scope := v.config.Settings.Scope; scope != "" && scope != ScopeChanged && scope != ScopeAll {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:      "settings.scope",
+			Value:      scope,
+			Issue:      "Invalid scope value",
+			Suggestion: fmt.Sprintf("Use '%s' or '%s'", ScopeChanged, ScopeAll),
+			Severity:   SeverityError,
+		})
+	}
+
 	if v.config.Settings.ToolsPolicy == "" {
 		return
 	}
@@ -262,8 +273,69 @@ func (v *ConfigValidator) validateCommands(commands []Hook, fieldPrefix string, 
 			v.validateCommand(cmd.FixCommand, cmdFieldPrefix+".fix_command", result)
 		}
 
+		// Validate file globs and placeholders
+		v.validateGlobs(cmd.Glob, cmdFieldPrefix+".glob", result)
+		v.validatePlaceholders(cmd.Command, cmdFieldPrefix+".command", result)
+		if cmd.FixCommand != "" {
+			v.validatePlaceholders(cmd.FixCommand, cmdFieldPrefix+".fix_command", result)
+		}
+
 		// Validate output rules
 		v.validateOutputRules(cmd.OutputRules, cmdFieldPrefix+".output_rules", result)
+	}
+}
+
+// validateGlobs rejects malformed glob patterns, which would otherwise make
+// the hook silently match no file and always be skipped.
+func (v *ConfigValidator) validateGlobs(globs []string, fieldPath string, result *ValidationResult) {
+	for i, pattern := range globs {
+		fieldPathI := fmt.Sprintf("%s[%d]", fieldPath, i)
+		if strings.TrimSpace(pattern) == "" {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:      fieldPathI,
+				Value:      pattern,
+				Issue:      "Glob pattern is empty",
+				Suggestion: "Use a pattern such as '*.go' or 'src/**/*.ts', or remove it",
+				Severity:   SeverityError,
+			})
+			continue
+		}
+		if _, err := path.Match(strings.TrimPrefix(pattern, "**/"), ""); err != nil {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:      fieldPathI,
+				Value:      pattern,
+				Issue:      "Invalid glob pattern",
+				Suggestion: "Check the brackets and escapes of the pattern (e.g. '*.go', '*.{js,ts}' is not supported: list each extension)",
+				Severity:   SeverityError,
+			})
+		}
+	}
+}
+
+// misspelledPlaceholders lists likely typos of the supported placeholders,
+// in a fixed order so validation output is deterministic.
+var misspelledPlaceholders = []struct{ typo, correct string }{
+	{"{file}", "{files}"},
+	{"{staged_files}", "{files}"},
+	{"{changed}", "{files}"},
+	{"{dir}", "{dirs}"},
+	{"{packages}", "{dirs}"},
+}
+
+// validatePlaceholders warns about placeholders that look like {files} or
+// {dirs} but would be passed literally to the shell.
+func (v *ConfigValidator) validatePlaceholders(command, fieldPath string, result *ValidationResult) {
+	for _, p := range misspelledPlaceholders {
+		typo, correct := p.typo, p.correct
+		if strings.Contains(command, typo) {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:      fieldPath,
+				Value:      command,
+				Issue:      fmt.Sprintf("Unknown placeholder %s", typo),
+				Suggestion: fmt.Sprintf("Use %s", correct),
+				Severity:   SeverityWarning,
+			})
+		}
 	}
 }
 

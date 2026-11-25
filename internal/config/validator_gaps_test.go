@@ -262,3 +262,53 @@ func TestGetFormattedErrors_NoErrors(t *testing.T) {
 		t.Errorf("unexpected message for zero errors: %q", got)
 	}
 }
+
+func TestValidateSettings_Scope(t *testing.T) {
+	for _, scope := range []string{"", ScopeChanged, ScopeAll} {
+		result := &ValidationResult{Valid: true}
+		NewConfigValidator(&Config{Settings: Settings{Scope: scope}}).validateSettings(result)
+		if _, ok := findSeverity(result.Errors, "settings.scope"); ok {
+			t.Errorf("scope %q should be valid, got %+v", scope, result.Errors)
+		}
+	}
+
+	result := &ValidationResult{Valid: true}
+	NewConfigValidator(&Config{Settings: Settings{Scope: "staged"}}).validateSettings(result)
+	if e, ok := findSeverity(result.Errors, "settings.scope"); !ok || e.Severity != SeverityError {
+		t.Errorf("expected an error for an unknown scope, got %+v", result.Errors)
+	}
+}
+
+func TestDefaultScope(t *testing.T) {
+	if got := (Settings{}).DefaultScope(); got != ScopeChanged {
+		t.Errorf("default scope = %q, want %q", got, ScopeChanged)
+	}
+	if got := (Settings{Scope: ScopeAll}).DefaultScope(); got != ScopeAll {
+		t.Errorf("scope = %q, want %q", got, ScopeAll)
+	}
+}
+
+func TestValidateCommands_GlobsAndPlaceholders(t *testing.T) {
+	hooks := []Hook{{
+		Name:       "x",
+		Command:    "gofmt -l {file}",
+		FixCommand: "go vet {packages}",
+		Glob:       []string{"*.go", "", "[a-"},
+	}}
+	result := &ValidationResult{Valid: true}
+	NewConfigValidator(&Config{}).validateCommands(hooks, "hooks.g.pre-commit", result)
+
+	for field, severity := range map[string]ValidationSeverity{
+		"hooks.g.pre-commit[0].glob[1]":     SeverityError,
+		"hooks.g.pre-commit[0].glob[2]":     SeverityError,
+		"hooks.g.pre-commit[0].command":     SeverityWarning,
+		"hooks.g.pre-commit[0].fix_command": SeverityWarning,
+	} {
+		if e, ok := findSeverity(result.Errors, field); !ok || e.Severity != severity {
+			t.Errorf("expected %v for %s, got %+v", severity, field, result.Errors)
+		}
+	}
+	if _, ok := findSeverity(result.Errors, "hooks.g.pre-commit[0].glob[0]"); ok {
+		t.Error("*.go is a valid glob")
+	}
+}

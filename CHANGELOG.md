@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Changed-files analysis by default: hooks can use `{files}` and `{dirs}` placeholders and a `glob` filter, so pre-commit only checks the staged files (pre-push, the files changed since the upstream). Hooks whose glob matches no changed file are skipped and count as passed. Hooks without placeholders or globs run as before.
+- `--all` flag, `QG_SCOPE=all` and `settings.scope: all` for a full analysis of every tracked file. The MCP `run_quality_checks` and `run_auto_fix` tools take an optional `scope` argument.
+- `--output=json` reports the run's `scope` and `skipped` / `skip_reason` per hook; the watermark trailer lists skipped hooks (`skipped=N`).
+
+### Changed
+
+- `--init` templates now check only changed files (`gofmt -l {files}`, `ruff check {files}`, `npx prettier --check {files}`, `go test {dirs}`…), use `gitleaks git --pre-commit --staged` and `golangci-lint run --new-from-rev=HEAD`, and run `go test ./...` on pre-push.
+
 ## [1.4.2] - 2026-10-29
 
 ### Changed

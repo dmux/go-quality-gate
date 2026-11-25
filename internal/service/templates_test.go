@@ -145,12 +145,15 @@ func TestGenerateNodeHooks_TypeScriptAndReactExpandPatterns(t *testing.T) {
 
 	hook := g.generateNodeHooks(structure)
 
-	formatCmd := hook.Commands[0].Command
-	if !strings.Contains(formatCmd, "*.ts") || !strings.Contains(formatCmd, "*.tsx") {
-		t.Errorf("expected TypeScript patterns in prettier command, got %q", formatCmd)
+	globs := strings.Join(hook.Commands[0].Glob, " ")
+	if !strings.Contains(globs, "*.ts") || !strings.Contains(globs, "*.tsx") {
+		t.Errorf("expected TypeScript globs for prettier, got %q", globs)
 	}
-	if !strings.Contains(formatCmd, "*.jsx") {
-		t.Errorf("expected React's .jsx pattern in prettier command, got %q", formatCmd)
+	if !strings.Contains(globs, "*.jsx") {
+		t.Errorf("expected React's .jsx glob for prettier, got %q", globs)
+	}
+	if hook.Commands[0].Command != "npx prettier --check {files}" {
+		t.Errorf("expected prettier to check only the changed files, got %q", hook.Commands[0].Command)
 	}
 }
 
@@ -160,9 +163,9 @@ func TestGenerateNodeHooks_PlainJavaScriptHasNoExtraPatterns(t *testing.T) {
 
 	hook := g.generateNodeHooks(structure)
 
-	formatCmd := hook.Commands[0].Command
-	if strings.Contains(formatCmd, "*.ts") || strings.Contains(formatCmd, "*.jsx") {
-		t.Errorf("expected no TypeScript/React patterns for a plain Node project, got %q", formatCmd)
+	globs := strings.Join(hook.Commands[0].Glob, " ")
+	if strings.Contains(globs, "*.ts") || strings.Contains(globs, "*.jsx") {
+		t.Errorf("expected no TypeScript/React globs for a plain Node project, got %q", globs)
 	}
 }
 
@@ -190,7 +193,7 @@ func TestGeneratePythonHooks_UsesDetectedPythonDirectory(t *testing.T) {
 	}
 
 	lint := hook.Commands[1]
-	if lint.FixCommand != "ruff check . --fix" {
+	if lint.FixCommand != "ruff check --fix {files}" {
 		t.Errorf("expected lint autofix via ruff check --fix, got %q", lint.FixCommand)
 	}
 }
@@ -358,5 +361,21 @@ func TestGenerateTemplate_RoundTripParsesAndValidates(t *testing.T) {
 	auditPush := py["pre-push"][0]
 	if !strings.Contains(auditPush.Command, "pip-audit") || auditPush.FixCommand == "" {
 		t.Errorf("expected pip-audit command with fix_command in pre-push, got %+v", auditPush)
+	}
+}
+
+func TestFormatHooksSection_EmitsGlob(t *testing.T) {
+	g := NewTemplateGenerator()
+
+	out := g.formatHooksSection([]HookTemplate{g.generateGoHooks()})
+
+	for _, want := range []string{
+		`command: "gofmt -l {files}"`,
+		`glob: ["*.go"]`,
+		"    pre-push:\n      - name: \"🧪 Tests\"\n        command: \"go test ./...\"",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in:\n%s", want, out)
+		}
 	}
 }

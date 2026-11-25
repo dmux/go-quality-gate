@@ -21,4 +21,7 @@ type HookRunner interface {
 	RunHooks(hooks []domain.Hook) []domain.ExecutionResult
 	RunHooksParallel(hooks []domain.Hook) []domain.ExecutionResult
 	RunFixCommand(hook domain.Hook) (string, error)
+	// LogResult reports one result the way RunHooks does, used for hooks
+	// skipped before reaching the runner.
+	LogResult(result domain.ExecutionResult)
 }

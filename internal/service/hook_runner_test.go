@@ -281,3 +281,20 @@ func TestHookRunnerService_RunHooks_ShowsOutputOnSuccessWhenShowOnAlways(t *test
 		t.Errorf("expected output to be logged on success when ShowOn=always, messages=%v", mockLogger.Messages)
 	}
 }
+
+func TestHookRunnerService_LogResult_Skipped(t *testing.T) {
+	mockLogger := &MockLogger{}
+	service := NewHookRunnerService(&MockShellRunner{}, mockLogger)
+
+	service.LogResult(domain.ExecutionResult{
+		Hook:       domain.Hook{Name: "Format", OutputRules: domain.OutputRules{ShowOn: "always"}},
+		Success:    true,
+		Skipped:    true,
+		SkipReason: "no matching changed files",
+		Output:     "should not be shown",
+	})
+
+	if len(mockLogger.Messages) != 1 || mockLogger.Messages[0] != "⏭️  Format skipped (no matching changed files)\n" {
+		t.Errorf("unexpected log output: %q", mockLogger.Messages)
+	}
+}
