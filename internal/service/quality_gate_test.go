@@ -45,7 +45,7 @@ func TestQualityGateService_Run_AllHooksPass(t *testing.T) {
 	}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	results, err := service.Run(sampleConfig(), "pre-commit", false)
+	results, err := service.Run(sampleConfig(), "pre-commit", RunOptions{})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -69,7 +69,7 @@ func TestQualityGateService_Run_OneHookFails(t *testing.T) {
 	}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	results, err := service.Run(sampleConfig(), "pre-commit", false)
+	results, err := service.Run(sampleConfig(), "pre-commit", RunOptions{})
 
 	if err == nil {
 		t.Fatal("expected an error when a hook fails")
@@ -90,7 +90,7 @@ func TestQualityGateService_Run_ToolInstallFails(t *testing.T) {
 	}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	results, err := service.Run(sampleConfig(), "pre-commit", false)
+	results, err := service.Run(sampleConfig(), "pre-commit", RunOptions{})
 
 	if err == nil {
 		t.Fatal("expected an error when tool installation fails")
@@ -110,7 +110,7 @@ func TestQualityGateService_Run_FiltersHooksByHookType(t *testing.T) {
 	hookRunner := &MockHookRunner{}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	if _, err := service.Run(sampleConfig(), "pre-push", false); err != nil {
+	if _, err := service.Run(sampleConfig(), "pre-push", RunOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -127,7 +127,7 @@ func TestQualityGateService_Run_UnknownHookTypeYieldsNoHooks(t *testing.T) {
 	hookRunner := &MockHookRunner{}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	results, err := service.Run(sampleConfig(), "post-checkout", false)
+	results, err := service.Run(sampleConfig(), "post-checkout", RunOptions{})
 
 	if err != nil {
 		t.Fatalf("expected no error for a hook type with no configured hooks, got %v", err)
@@ -149,7 +149,7 @@ func TestQualityGateService_Run_ParallelFlagRoutesToRunHooksParallel(t *testing.
 	}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	results, err := service.Run(sampleConfig(), "pre-commit", true)
+	results, err := service.Run(sampleConfig(), "pre-commit", RunOptions{Parallel: true})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -171,7 +171,7 @@ func TestQualityGateService_Fix_Success(t *testing.T) {
 	hookRunner := &MockHookRunner{}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	if err := service.Fix(sampleConfig(), "pre-commit"); err != nil {
+	if err := service.Fix(sampleConfig(), "pre-commit", ""); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
@@ -196,7 +196,7 @@ func TestQualityGateService_Fix_CommandFails(t *testing.T) {
 	}
 	service := NewQualityGateService(toolManager, hookRunner)
 
-	err := service.Fix(sampleConfig(), "pre-commit")
+	err := service.Fix(sampleConfig(), "pre-commit", "")
 
 	if err == nil {
 		t.Fatal("expected an error when the fix command fails")
@@ -230,7 +230,7 @@ func TestQualityGateService_Fix_ContinuesAfterFailure(t *testing.T) {
 	}
 	service := NewQualityGateService(&MockToolManager{}, hookRunner)
 
-	err := service.Fix(cfg, "pre-commit")
+	err := service.Fix(cfg, "pre-commit", "")
 
 	if err == nil {
 		t.Fatal("expected an error when a fix command fails")
@@ -261,7 +261,7 @@ func TestQualityGateService_Fix_NoFixCommandsConfigured(t *testing.T) {
 		},
 	}
 
-	if err := service.Fix(cfg, "pre-commit"); err != nil {
+	if err := service.Fix(cfg, "pre-commit", ""); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if hookRunner.FixedHooks != nil {

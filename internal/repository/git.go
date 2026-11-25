@@ -44,3 +44,18 @@ type AttestationStateRepository interface {
 	SaveAttestation(content []byte) error
 	DeleteAttestation() error
 }
+
+// FileLister lists the files a quality gate run analyzes. Paths are relative
+// to the repository root.
+type FileLister interface {
+	// StagedFiles returns the added, copied, modified and renamed files of
+	// the index, i.e. what the next commit changes. Deleted files are left
+	// out since there is nothing left to check.
+	StagedFiles() ([]string, error)
+	// PushFiles returns the files changed between the upstream of the
+	// current branch and HEAD. Without an upstream it returns every
+	// tracked file, so a first push is checked in full.
+	PushFiles() ([]string, error)
+	// TrackedFiles returns every file tracked by git.
+	TrackedFiles() ([]string, error)
+}

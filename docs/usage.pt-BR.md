@@ -79,7 +79,7 @@ git commit -m "feat: adiciona login"
 
 O que acontece por trás:
 
-1. **`pre-commit`** roda os checks do `quality.yml`.
+1. **`pre-commit`** roda os checks do `quality.yml` **apenas nos arquivos em stage**: hooks com `{files}`, `{dirs}` ou `glob` recebem só os arquivos alterados e são pulados (`⏭️`) quando nenhum casa. Precisa de uma análise completa? Rode `QG_SCOPE=all git commit …` ou `quality-gate --all pre-commit`.
    - Um check falhando **bloqueia** o commit. Corrija (ou rode `quality-gate --fix pre-commit`) e tente de novo.
    - Se todos passarem, o quality-gate guarda um hash do conteúdo em stage e do `quality.yml`.
 2. **Você escreve a mensagem** (`-m` ou editor).
@@ -87,7 +87,7 @@ O que acontece por trás:
    ```
    feat: adiciona login
 
-   Quality-Gate: v1.4.2; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
+   Quality-Gate: v1.4.3; tree=db228f6d…; config=sha256:4feac6c2…; checks=3/3
    ```
    Aparece a mensagem `🔏 Commit watermarked by quality-gate.`
 4. **O commit é criado** com o watermark.
@@ -118,7 +118,8 @@ O hook `commit-msg` nunca bloqueia o commit; ele só avisa. Quem barra de fato �
 ```bash
 quality-gate --fix pre-commit            # roda os comandos de correção (ruff format, pytest…)
 quality-gate --fix pre-push              # roda pip-audit --fix: atualiza pins vulneráveis
-quality-gate pre-commit                  # roda os checks manualmente
+quality-gate pre-commit                  # roda os checks manualmente (arquivos em stage)
+quality-gate --all pre-commit            # análise completa de todos os arquivos versionados
 quality-gate pre-push                    # re-roda a auditoria de dependências sob demanda
 quality-gate --output=json pre-commit    # saída para máquinas
 ```

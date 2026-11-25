@@ -212,3 +212,33 @@ func TestParseTrailer_RoundTrip(t *testing.T) {
 		t.Fatalf("round trip produced %+v", got)
 	}
 }
+
+func TestAttestation_RecordCountsSkippedHooks(t *testing.T) {
+	f := &fakeGit{indexTree: "tree-a"}
+	s := newTestAttestation(f)
+
+	results := []domain.ExecutionResult{{Success: true}, {Success: true, Skipped: true}}
+	if err := s.Record(results, testConfig); err != nil {
+		t.Fatal(err)
+	}
+	msg := writeMessage(t, "feat: add thing\n")
+	if outcome, err := s.Stamp(msg, testConfig, ""); err != nil || outcome != StampAdded {
+		t.Fatalf("outcome %v, err %v; want StampAdded", outcome, err)
+	}
+	if got := readMessage(t, msg); !strings.Contains(got, "checks=1/2; skipped=1") {
+		t.Fatalf("message %q lacks the skipped count", got)
+	}
+}
+
+func TestParseTrailer_Skipped(t *testing.T) {
+	a, err := ParseTrailer("v1.5.0; tree=t; config=c; checks=1/2; skipped=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Passed != 1 || a.Total != 2 || a.Skipped != 1 {
+		t.Errorf("unexpected parse: %+v", a)
+	}
+	if got := FormatTrailer(a); got != "Quality-Gate: v1.5.0; tree=t; config=c; checks=1/2; skipped=1" {
+		t.Errorf("FormatTrailer round trip = %q", got)
+	}
+}

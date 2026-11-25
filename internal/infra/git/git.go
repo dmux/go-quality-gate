@@ -182,6 +182,45 @@ func (r *RealGitRepository) AddTrailer(messageFile, trailer string) error {
 	return err
 }
 
+// StagedFiles implements the FileLister interface.
+func (r *RealGitRepository) StagedFiles() ([]string, error) {
+	return listFiles("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+}
+
+// PushFiles implements the FileLister interface.
+func (r *RealGitRepository) PushFiles() ([]string, error) {
+	if _, err := runGit("rev-parse", "--verify", "--quiet", "@{upstream}"); err != nil {
+		return r.TrackedFiles()
+	}
+	return listFiles("diff", "--name-only", "--diff-filter=ACMR", "-z", "@{upstream}...HEAD")
+}
+
+// TrackedFiles implements the FileLister interface. The ":/" pathspec and
+// --full-name make the paths root-relative, matching git diff's output, even
+// when run from a subdirectory.
+func (r *RealGitRepository) TrackedFiles() ([]string, error) {
+	return listFiles("ls-files", "-z", "--full-name", "--", ":/")
+}
+
+// listFiles runs a git command whose -z output is a NUL-separated list of
+// paths, so names with spaces or newlines survive intact.
+func listFiles(args ...string) ([]string, error) {
+	cmd := exec.Command("git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	var files []string
+	for _, f := range strings.Split(string(out), "\x00") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files, nil
+}
+
 func runGit(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	var stderr bytes.Buffer
