@@ -72,6 +72,8 @@ type Tool struct {
 
 type Hooks map[string]map[string][]Hook
 
+const HookScopeStaged = "staged"
+
 type Hook struct {
 	Name       string `yaml:"name"`
 	Command    string `yaml:"command"`
@@ -79,6 +81,8 @@ type Hook struct {
 	// Glob limits the hook to changed files matching one of the patterns
 	// (e.g. "*.go"); the hook is skipped when none match.
 	Glob        []string    `yaml:"glob,omitempty"`
+	// Scope overrides settings.scope for this hook. "staged" always checks the commit index.
+	Scope       string      `yaml:"scope,omitempty"`
 	OutputRules OutputRules `yaml:"output_rules,omitempty"`
 }
 

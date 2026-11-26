@@ -243,6 +243,12 @@ func (v *ConfigValidator) validateCommands(commands []Hook, fieldPrefix string, 
 
 	for i, cmd := range commands {
 		cmdFieldPrefix := fmt.Sprintf("%s[%d]", fieldPrefix, i)
+		if cmd.Scope != "" && cmd.Scope != HookScopeStaged {
+			result.Errors = append(result.Errors, ValidationError{
+				Field: cmdFieldPrefix + ".scope", Value: cmd.Scope,
+				Issue: "Invalid hook scope", Suggestion: "Use 'staged'", Severity: SeverityError,
+			})
+		}
 
 		// Validate command name
 		if strings.TrimSpace(cmd.Name) == "" {
