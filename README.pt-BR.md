@@ -98,6 +98,7 @@ hooks:
     pre-commit:
       - name: "🔒 Verificação de Segredos"
         command: "gitleaks git --pre-commit --staged --verbose"
+        scope: staged
         output_rules:
           on_failure_message: "Vazamento de segredo detectado!"
 
@@ -131,6 +132,12 @@ hooks:
         fix_command: "npx prettier --write {files}"
         glob: ["frontend/**/*.ts", "frontend/**/*.tsx"]
 ```
+
+
+Um hook pode usar `scope: staged` para sempre analisar o conteúdo do stage,
+mesmo quando `settings.scope: all` estiver configurado. Combine com `{files}`
+para ferramentas que aceitam caminhos explícitos. Hooks sem essa opção continuam
+seguindo o escopo do repositório; testes podem continuar cobrindo o projeto todo.
 
 > A auditoria de dependências com `pip-audit` roda tanto no `pre-commit`
 > quanto no `pre-push` e precisa de acesso à rede (PyPI/OSV). Vai committar

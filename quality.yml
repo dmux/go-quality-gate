@@ -8,5 +8,6 @@ hooks:
     pre-commit:
       - name: "🔒 Verificação de Segredos"
         command: "gitleaks git --pre-commit --staged --verbose"
+        scope: staged
         output_rules:
           on_failure_message: "Vazamento de segredo detectado!"

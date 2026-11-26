@@ -148,6 +148,7 @@ hooks:
     pre-commit:
       - name: "🔒 Security Check"
         command: "gitleaks git --pre-commit --staged --verbose"
+        scope: staged
         output_rules:
           on_failure_message: "Secret leak detected!"
 
@@ -181,6 +182,12 @@ hooks:
         fix_command: "npx prettier --write {files}"
         glob: ["frontend/**/*.ts", "frontend/**/*.tsx"]
 ```
+
+
+A hook may set `scope: staged` to always use the commit index, even when
+`settings.scope: all` is configured. Combine it with `{files}` for tools that
+accept explicit paths. Hooks without this setting keep following the repository
+scope; whole-project checks such as tests can remain project-wide.
 
 > The `pip-audit` dependency audit runs on both `pre-commit` and `pre-push` and
 > needs network access (PyPI/OSV). Committing offline? Skip the gate with

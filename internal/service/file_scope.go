@@ -24,11 +24,10 @@ const (
 	ScopeEnvVar = "QG_SCOPE"
 )
 
-// usesFiles reports whether a hook depends on the files of the run: through
-// a placeholder in the given command or a glob filter. Hooks that don't keep
-// running unchanged, whatever the scope.
+// usesFiles reports whether a hook depends on the files of the run through a
+// scope override, a placeholder, or a glob filter.
 func usesFiles(hook domain.Hook, command string) bool {
-	return len(hook.Glob) > 0 || strings.Contains(command, FilesPlaceholder) || strings.Contains(command, DirsPlaceholder)
+	return hook.Scope == config.HookScopeStaged || len(hook.Glob) > 0 || strings.Contains(command, FilesPlaceholder) || strings.Contains(command, DirsPlaceholder)
 }
 
 // resolveFiles returns the files a run analyzes: every tracked file for
@@ -168,8 +167,8 @@ type scopedHook struct {
 // the files of the run. Files are only resolved when a hook needs them, so
 // configs without placeholders or globs never call git.
 func (s *QualityGateService) planHooks(hooks []domain.Hook, hookType string, scope domain.Scope, fix bool) ([]scopedHook, error) {
-	var files []string
-	resolved := false
+	filesByScope := make(map[domain.Scope][]string)
+	resolvedScope := make(map[domain.Scope]bool)
 	planned := make([]scopedHook, len(hooks))
 
 	for i, hook := range hooks {
@@ -182,19 +181,24 @@ func (s *QualityGateService) planHooks(hooks []domain.Hook, hookType string, sco
 			continue
 		}
 
-		if !resolved {
-			var err error
-			if files, err = resolveFiles(s.files, hookType, scope); err != nil {
+		hookScope := scope
+		if hook.Scope == config.HookScopeStaged {
+			hookScope = domain.ScopeChanged
+		}
+		if !resolvedScope[hookScope] {
+			files, err := resolveFiles(s.files, hookType, hookScope)
+			if err != nil {
 				return nil, fmt.Errorf("failed to list the files to check: %w", err)
 			}
-			resolved = true
+			filesByScope[hookScope] = files
+			resolvedScope[hookScope] = true
 		}
 
-		matched := filterGlob(files, hook.Glob)
+		matched := filterGlob(filesByScope[hookScope], hook.Glob)
 		if len(matched) == 0 {
 			planned[i].skipped = true
 			planned[i].skipReason = "no matching changed files"
-			if scope == domain.ScopeAll {
+			if hookScope == domain.ScopeAll {
 				planned[i].skipReason = "no matching files"
 			}
 			continue
@@ -214,13 +218,23 @@ func (s *QualityGateService) planHooks(hooks []domain.Hook, hookType string, sco
 // so there is nothing worth reporting.
 func (s *QualityGateService) DescribeScope(cfg *config.Config, hookType string, scope domain.Scope) (summary string, ok bool) {
 	needed := false
+	allFileHooksStaged := true
 	for _, h := range s.getHooksToRun(cfg.Hooks, hookType) {
-		needed = needed || usesFiles(h, h.Command)
+		if usesFiles(h, h.Command) {
+			needed = true
+			if h.Scope != config.HookScopeStaged {
+				allFileHooksStaged = false
+			}
+		}
 	}
 	if !needed {
 		return "", false
 	}
-	files, err := resolveFiles(s.files, hookType, scope)
+	scopeForSummary := scope
+	if allFileHooksStaged {
+		scopeForSummary = domain.ScopeChanged
+	}
+	files, err := resolveFiles(s.files, hookType, scopeForSummary)
 	if err != nil {
 		return "", false
 	}
@@ -228,7 +242,7 @@ func (s *QualityGateService) DescribeScope(cfg *config.Config, hookType string, 
 	if len(files) == 1 {
 		noun = "file"
 	}
-	if scope == domain.ScopeAll {
+	if scopeForSummary == domain.ScopeAll {
 		return fmt.Sprintf("full (%d tracked %s)", len(files), noun), true
 	}
 	return fmt.Sprintf("%d changed %s (use --all for a full analysis)", len(files), noun), true

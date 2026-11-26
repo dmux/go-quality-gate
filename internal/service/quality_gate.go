@@ -217,6 +217,7 @@ func (s *QualityGateService) getHooksToRun(configHooks config.Hooks, hookType st
 					Command:    h.Command,
 					FixCommand: h.FixCommand,
 					Glob:       h.Glob,
+					Scope:      h.Scope,
 					OutputRules: domain.OutputRules{
 						ShowOn:           h.OutputRules.ShowOn,
 						OnFailureMessage: h.OutputRules.OnFailureMessage,
