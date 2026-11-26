@@ -80,7 +80,7 @@ type Hook struct {
 	FixCommand string `yaml:"fix_command,omitempty"`
 	// Glob limits the hook to changed files matching one of the patterns
 	// (e.g. "*.go"); the hook is skipped when none match.
-	Glob        []string    `yaml:"glob,omitempty"`
+	Glob []string `yaml:"glob,omitempty"`
 	// Scope overrides settings.scope for this hook. "staged" always checks the commit index.
 	Scope       string      `yaml:"scope,omitempty"`
 	OutputRules OutputRules `yaml:"output_rules,omitempty"`

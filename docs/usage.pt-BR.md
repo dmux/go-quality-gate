@@ -92,6 +92,23 @@ O que acontece por trás:
    Aparece a mensagem `🔏 Commit watermarked by quality-gate.`
 4. **O commit é criado** com o watermark.
 
+
+Para sobrescrever o escopo de um hook, adicione `scope: staged`. Isso força
+a análise dos arquivos em stage mesmo quando `settings.scope: all` estiver
+configurado. Use `{files}` para ferramentas que aceitam caminhos explícitos;
+hooks sem essa opção continuam seguindo o escopo do repositório.
+
+```yaml
+hooks:
+  backend:
+    pre-commit:
+      - name: Formatação Go
+        command: "gofmt -d {files}"
+        scope: staged
+      - name: Testes unitários
+        command: "go test ./..."
+```
+
 Para conferir:
 
 ```bash

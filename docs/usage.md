@@ -92,6 +92,23 @@ What happens behind the scenes:
    You will see `🔏 Commit watermarked by quality-gate.`
 4. **The commit is created** with the watermark.
 
+
+For a per-hook override, add `scope: staged`. It forces that hook to use the
+index even when `settings.scope: all` is configured. Use `{files}` for tools
+that accept explicit paths; hooks without this setting keep following the
+repository scope.
+
+```yaml
+hooks:
+  backend:
+    pre-commit:
+      - name: Go formatting
+        command: "gofmt -d {files}"
+        scope: staged
+      - name: Unit tests
+        command: "go test ./..."
+```
+
 Check it:
 
 ```bash
